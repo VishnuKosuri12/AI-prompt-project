@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChemTrack - Location Management</title>
+    <link rel="stylesheet" href="{{static_url}}/styles.css">
+    <style>
+        .location-management-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .location-list-section {
+            flex: 1;
+            min-width: 400px;
+        }
+        .location-form-section {
+            flex: 1;
+            min-width: 400px;
+        }
+        .location-list {
+            height: 350px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .location-grid {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .location-grid th {
+            background-color: #f2f2f2;
+            text-align: left;
+            padding: 10px;
+            position: sticky;
+            top: 0;
+            border-bottom: 2px solid #ddd;
+        }
+        .location-grid tr {
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        .location-grid tr:hover {
+            background-color: #f9f9f9;
+        }
+        .location-grid tr.selected {
+            background-color: #e0f7fa;
+        }
+        .location-grid td {
+            padding: 10px;
+        }
+        .location-form {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .form-group {
+            flex: 1;
+            min-width: 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .form-group.error input, .form-group.error select {
+            border-color: #f44336;
+        }
+        .error-message {
+            color: #f44336;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .buttons-row {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .create-btn {
+            background-color: #4caf50;
+            color: white;
+        }
+        .save-btn {
+            background-color: #2196f3;
+            color: white;
+        }
+        .cancel-btn {
+            background-color: #f44336;
+            color: white;
+        }
+        .delete-btn {
+            background-color: #ff9800;
+            color: white;
+        }
+        .disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        h2 {
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        .filter-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .filter-group {
+            flex: 1;
+            min-width: 0;
+        }
+        .filter-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .filter-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header - pulled from shared templates -->
+        {{ header_html|safe }}
+
+        <!-- Main Content -->
+        <div class="main-container">
+            <!-- Navigation Sidebar - pulled from shared templates -->
+            {{ navigation_html|safe }}
+
+            <!-- Content Area -->
+            <main class="content">
+                <div class="container">
+                    <h1 class="page-title">Location Management</h1>
+                    
+                    {% if error %}
+                    <div class="error-message">{{ error }}</div>
+                    {% endif %}
+                    
+                    <div class="location-management-container">
+                        <!-- Location List Section -->
+                        <div class="location-list-section">
+                            <h2>Location List</h2>
+                            <div class="filter-row">
+                                <div class="filter-group">
+                                    <label for="buildingFilter">Building:</label>
+                                    <input type="text" id="buildingFilter" placeholder="Filter by building...">
+                                </div>
+                                <div class="filter-group">
+                                    <label for="roomFilter">Room:</label>
+                                    <input type="text" id="roomFilter" placeholder="Filter by room...">
+                                </div>
+                            </div>
+                            <div class="location-list">
+                                <table class="location-grid" id="locationGrid">
+                                    <thead>
+                                        <tr>
+                                            <th>Building</th>
+                                            <th>Room</th>
+                                            <th>Locker</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="locationList">
+                                        {% for location in locations %}
+                                        <tr class="location-list-item" 
+                                            data-location-id="{{ location.location_id }}" 
+                                            data-building="{{ location.building_name }}" 
+                                            data-room="{{ location.lab_room_number }}"
+                                            data-locker="{{ location.locker_number }}">
+                                            <td><strong>{{ location.building_name }}</strong></td>
+                                            <td>{{ location.lab_room_number }}</td>
+                                            <td>{{ location.locker_number }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Location Form Section -->
+                        <div class="location-form-section">
+                            <h2>Location Details</h2>
+                            <div class="location-form">
+                                <form id="locationForm">
+                                    <div class="form-row">
+                                        <div class="form-group" id="buildingGroup">
+                                            <label for="building">Building:</label>
+                                            <input type="text" id="building" name="building" list="buildingList" required>
+                                            <datalist id="buildingList">
+                                                {% for building in buildings %}
+                                                <option value="{{ building }}">
+                                                {% endfor %}
+                                            </datalist>
+                                            <div class="error-message" id="buildingError"></div>
+                                        </div>
+                                        
+                                        <div class="form-group" id="roomGroup">
+                                            <label for="room">Lab Room Number:</label>
+                                            <input type="number" id="room" name="room" min="1" required>
+                                            <div class="error-message" id="roomError"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-row">
+                                        <div class="form-group" id="lockerGroup">
+                                            <label for="locker">Locker Number:</label>
+                                            <input type="number" id="locker" name="locker" min="1" required>
+                                            <div class="error-message" id="lockerError"></div>
+                                        </div>
+                                        
+                                        <!-- Placeholder for future form field if needed -->
+                                        <div class="form-group">
+                                            <!-- Empty to maintain layout balance -->
+                                        </div>
+                                    </div>
+                                    
+                                    <input type="hidden" id="locationId" name="locationId">
+                                </form>
+                            </div>
+                            
+                            <!-- Buttons -->
+                            <div class="buttons-row">
+                                <button id="createLocationBtn" class="button create-btn">Create Location</button>
+                                <button id="saveChangesBtn" class="button save-btn disabled">Save Changes</button>
+                                <button id="cancelChangesBtn" class="button cancel-btn disabled">Cancel Changes</button>
+                                <button id="deleteLocationBtn" class="button delete-btn disabled">Delete Location</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const locationList = document.getElementById('locationList');
+                        const locationForm = document.getElementById('locationForm');
+                        const createLocationBtn = document.getElementById('createLocationBtn');
+                        const saveChangesBtn = document.getElementById('saveChangesBtn');
+                        const cancelChangesBtn = document.getElementById('cancelChangesBtn');
+                        const deleteLocationBtn = document.getElementById('deleteLocationBtn');
+                        const buildingFilter = document.getElementById('buildingFilter');
+                        const roomFilter = document.getElementById('roomFilter');
+                        
+                        // Form fields
+                        const buildingInput = document.getElementById('building');
+                        const roomInput = document.getElementById('room');
+                        const lockerInput = document.getElementById('locker');
+                        const locationIdInput = document.getElementById('locationId');
+                        
+                        // Error message elements
+                        const buildingError = document.getElementById('buildingError');
+                        const roomError = document.getElementById('roomError');
+                        const lockerError = document.getElementById('lockerError');
+                        
+                        let isEditMode = false;
+                        let isCreateMode = false;
+                        let selectedLocation = null;
+                        
+                        // Filter locations
+                        function filterLocations() {
+                            const buildingText = buildingFilter.value.toLowerCase();
+                            const roomText = roomFilter.value.toLowerCase();
+                            
+                            const rows = locationList.querySelectorAll('tr.location-list-item');
+                            rows.forEach(row => {
+                                const building = row.getAttribute('data-building').toLowerCase();
+                                const room = row.getAttribute('data-room').toString().toLowerCase();
+                                
+                                const buildingMatch = !buildingText || building.includes(buildingText);
+                                const roomMatch = !roomText || room.includes(roomText);
+                                
+                                if (buildingMatch && roomMatch) {
+                                    row.style.display = '';
+                                } else {
+                                    row.style.display = 'none';
+                                }
+                            });
+                        }
+                        
+                        // Clear form and error messages
+                        function clearForm() {
+                            locationForm.reset();
+                            clearErrors();
+                            locationIdInput.value = '';
+                        }
+                        
+                        // Clear error messages
+                        function clearErrors() {
+                            buildingError.textContent = '';
+                            roomError.textContent = '';
+                            lockerError.textContent = '';
+                            
+                            document.getElementById('buildingGroup').classList.remove('error');
+                            document.getElementById('roomGroup').classList.remove('error');
+                            document.getElementById('lockerGroup').classList.remove('error');
+                        }
+                        
+                        // Enable edit mode
+                        function enableEditMode() {
+                            isEditMode = true;
+                            isCreateMode = false;
+                            
+                            saveChangesBtn.classList.remove('disabled');
+                            cancelChangesBtn.classList.remove('disabled');
+                            deleteLocationBtn.classList.remove('disabled');
+                            
+                            // Disable selecting locations from the list
+                            const locationItems = locationList.querySelectorAll('.location-list-item');
+                            locationItems.forEach(item => {
+                                item.style.pointerEvents = 'none';
+                                item.style.opacity = '0.6';
+                            });
+                        }
+                        
+                        // Disable edit mode
+                        function disableEditMode() {
+                            isEditMode = false;
+                            isCreateMode = false;
+                            
+                            saveChangesBtn.classList.add('disabled');
+                            cancelChangesBtn.classList.add('disabled');
+                            deleteLocationBtn.classList.add('disabled');
+                            
+                            // Enable selecting locations from the list
+                            const locationItems = locationList.querySelectorAll('.location-list-item');
+                            locationItems.forEach(item => {
+                                item.style.pointerEvents = 'auto';
+                                item.style.opacity = '1';
+                            });
+                        }
+                        
+                        // Enable create mode
+                        function enableCreateMode() {
+                            isCreateMode = true;
+                            isEditMode = false;
+                            
+                            clearForm();
+                            selectLocation(null);
+                            
+                            saveChangesBtn.classList.remove('disabled');
+                            cancelChangesBtn.classList.remove('disabled');
+                            deleteLocationBtn.classList.add('disabled');
+                            
+                            // Disable selecting locations from the list
+                            const locationItems = locationList.querySelectorAll('.location-list-item');
+                            locationItems.forEach(item => {
+                                item.style.pointerEvents = 'none';
+                                item.style.opacity = '0.6';
+                            });
+                        }
+                        
+                        // Select a location
+                        function selectLocation(locationItem) {
+                            // Remove selection from all locations
+                            const locationItems = locationList.querySelectorAll('.location-list-item');
+                            locationItems.forEach(item => {
+                                item.classList.remove('selected');
+                            });
+                            
+                            if (locationItem) {
+                                // Add selection to the clicked location
+                                locationItem.classList.add('selected');
+                                
+                                // Fill form with location data
+                                const locationId = locationItem.getAttribute('data-location-id');
+                                const building = locationItem.getAttribute('data-building');
+                                const room = locationItem.getAttribute('data-room');
+                                const locker = locationItem.getAttribute('data-locker');
+                                
+                                buildingInput.value = building;
+                                roomInput.value = room;
+                                lockerInput.value = locker;
+                                locationIdInput.value = locationId;
+                                
+                                selectedLocation = locationId;
+                                
+                                // Enable delete button
+                                deleteLocationBtn.classList.remove('disabled');
+                            } else {
+                                clearForm();
+                                selectedLocation = null;
+                                
+                                // Disable delete button
+                                deleteLocationBtn.classList.add('disabled');
+                            }
+                        }
+                        
+                        // Validate form
+                        function validateForm() {
+                            let isValid = true;
+                            clearErrors();
+                            
+                            // Validate building
+                            if (!buildingInput.value.trim()) {
+                                buildingError.textContent = 'Building is required';
+                                document.getElementById('buildingGroup').classList.add('error');
+                                isValid = false;
+                            }
+                            
+                            // Validate room
+                            if (!roomInput.value.trim()) {
+                                roomError.textContent = 'Room number is required';
+                                document.getElementById('roomGroup').classList.add('error');
+                                isValid = false;
+                            } else if (isNaN(roomInput.value) || parseInt(roomInput.value) < 1) {
+                                roomError.textContent = 'Room number must be a positive integer';
+                                document.getElementById('roomGroup').classList.add('error');
+                                isValid = false;
+                            }
+                            
+                            // Validate locker
+                            if (!lockerInput.value.trim()) {
+                                lockerError.textContent = 'Locker number is required';
+                                document.getElementById('lockerGroup').classList.add('error');
+                                isValid = false;
+                            } else if (isNaN(lockerInput.value) || parseInt(lockerInput.value) < 1) {
+                                lockerError.textContent = 'Locker number must be a positive integer';
+                                document.getElementById('lockerGroup').classList.add('error');
+                                isValid = false;
+                            }
+                            
+                            return isValid;
+                        }
+                        
+                        // Event listener for location list items
+                        locationList.addEventListener('click', function(event) {
+                            const locationItem = event.target.closest('.location-list-item');
+                            if (locationItem && !isEditMode && !isCreateMode) {
+                                selectLocation(locationItem);
+                            }
+                        });
+                        
+                        // Event listener for create location button
+                        createLocationBtn.addEventListener('click', function() {
+                            enableCreateMode();
+                        });
+                        
+                        // Event listener for save changes button
+                        saveChangesBtn.addEventListener('click', function() {
+                            if (saveChangesBtn.classList.contains('disabled')) {
+                                return;
+                            }
+                            
+                            if (validateForm()) {
+                                const locationData = {
+                                    building_name: buildingInput.value.trim(),
+                                    lab_room_number: parseInt(roomInput.value),
+                                    locker_number: parseInt(lockerInput.value)
+                                };
+                                
+                                if (isCreateMode) {
+                                    // Create new location
+                                    fetch(`/admin/create_location`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify(locationData)
+                                    })
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            // Reload the page to show the new location
+                                            window.location.reload();
+                                        } else {
+                                            alert('Error creating location: ' + data.message);
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('Error creating location:', error);
+                                        alert('Error creating location. Please try again.');
+                                    });
+                                } else if (isEditMode && selectedLocation) {
+                                    // Update existing location
+                                    locationData.location_id = parseInt(locationIdInput.value);
+                                    
+                                    fetch(`/admin/update_location`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify(locationData)
+                                    })
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            // Reload the page to show updated data
+                                            window.location.reload();
+                                        } else {
+                                            alert('Error updating location: ' + data.message);
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('Error updating location:', error);
+                                        alert('Error updating location. Please try again.');
+                                    });
+                                }
+                                
+                                disableEditMode();
+                            }
+                        });
+                        
+                        // Event listener for cancel changes button
+                        cancelChangesBtn.addEventListener('click', function() {
+                            if (cancelChangesBtn.classList.contains('disabled')) {
+                                return;
+                            }
+                            
+                            disableEditMode();
+                            
+                            if (selectedLocation) {
+                                // Reselect the current location to refresh form data
+                                const selectedItem = locationList.querySelector(`.location-list-item[data-location-id="${selectedLocation}"]`);
+                                selectLocation(selectedItem);
+                            } else {
+                                clearForm();
+                            }
+                        });
+                        
+                        // Event listener for delete location button
+                        deleteLocationBtn.addEventListener('click', function() {
+                            if (deleteLocationBtn.classList.contains('disabled') || !selectedLocation) {
+                                return;
+                            }
+                            
+                            // Check if location has inventory before deleting
+                            fetch(`/admin/check_location/${selectedLocation}`)
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.success) {
+                                        if (data.has_inventory) {
+                                            alert('Cannot delete location. There is inventory at this location.');
+                                        } else {
+                                            // Confirm deletion
+                                            if (confirm('Are you sure you want to delete this location?')) {
+                                                // Delete location
+                                                fetch(`/admin/delete_location/${selectedLocation}`, {
+                                                    method: 'DELETE'
+                                                })
+                                                .then(response => response.json())
+                                                .then(data => {
+                                                    if (data.success) {
+                                                        // Reload the page to show updated data
+                                                        window.location.reload();
+                                                    } else {
+                                                        alert('Error deleting location: ' + data.message);
+                                                    }
+                                                })
+                                                .catch(error => {
+                                                    console.error('Error deleting location:', error);
+                                                    alert('Error deleting location. Please try again.');
+                                                });
+                                            }
+                                        }
+                                    } else {
+                                        alert('Error checking location inventory: ' + data.message);
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Error checking location inventory:', error);
+                                    alert('Error checking location inventory. Please try again.');
+                                });
+                        });
+                        
+                        // Watch for form field changes to enable edit mode
+                        const formFields = [buildingInput, roomInput, lockerInput];
+                        formFields.forEach(field => {
+                            field.addEventListener('change', function() {
+                                if (selectedLocation && !isEditMode && !isCreateMode) {
+                                    enableEditMode();
+                                }
+                            });
+                            
+                            // Also add keyup event for immediate feedback
+                            field.addEventListener('keyup', function() {
+                                if (selectedLocation && !isEditMode && !isCreateMode) {
+                                    enableEditMode();
+                                }
+                            });
+                        });
+                        
+                        // Event listeners for filter inputs
+                        buildingFilter.addEventListener('input', filterLocations);
+                        roomFilter.addEventListener('input', filterLocations);
+                        
+                        // Initialize with form disabled
+                        disableEditMode();
+                        clearForm();
+                    });
+                </script>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

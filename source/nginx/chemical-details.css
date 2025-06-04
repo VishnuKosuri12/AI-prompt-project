@@ -1,0 +1,108 @@
+/* Additional styles for Chemical Details page */
+.card-title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+/* Override the display:none from search-styles.css when inventory dialog is shown */
+.inventory-dialog-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.inventory-dialog-container .inventory-dialog {
+    display: block;
+    position: relative;
+    width: 400px;
+    max-width: 90%;
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 1001;
+    padding: var(--spacing-md);
+    margin: 0 auto !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: 0 !important;
+    transform: none !important;
+}
+
+.inventory-error {
+    color: #721c24;
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 4px;
+}
+
+.inventory-success {
+    color: #155724;
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 4px;
+}
+
+/* Make sure form buttons are properly spaced */
+.inventory-dialog-actions {
+    margin-top: 15px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Style for the forms on the chemical details page */
+.quantity-actions form {
+    display: inline-block;
+    margin-right: 10px;
+}
+
+/* Custom grid for quantity related fields */
+.quantity-details-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, auto));
+    gap: var(--spacing-md);
+    max-width: 600px; /* Limit the width to keep fields together */
+}
+
+/* Ensure quantity field labels and values align properly */
+.quantity-details-grid .detail-group {
+    min-width: 150px;
+}
+
+/* Custom layout for primary and secondary information */
+.primary-info {
+    display: grid;
+    grid-template-columns: 1fr 2fr 2fr;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.secondary-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+}
+
+/* Ensure the width of primary info items */
+.primary-info .detail-group {
+    min-width: 150px;
+}
+
+/* Allow long text to wrap properly */
+.detail-value {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}

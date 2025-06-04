@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChemTrack - Chemical Details</title>
+    <link rel="stylesheet" href="{{static_url}}/styles.css">
+    <link rel="stylesheet" href="{{static_url}}/search-styles.css">
+    <link rel="stylesheet" href="{{static_url}}/chemical-details.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header - pulled from shared templates -->
+        {{ header_html|safe }}
+
+        <!-- Main Content -->
+        <div class="main-container">
+            <!-- Navigation Sidebar - pulled from shared templates -->
+            {{ navigation_html|safe }}
+
+            <!-- Content Area -->
+            <main class="content">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title-container">
+                            <h2 class="card-title">Chemical Details</h2>
+                            <a href="/search" class="btn" id="back-to-search">Close</a>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Primary Information Row -->
+                        <div class="primary-info">
+                            <div class="detail-group">
+                                <div class="detail-label">Chemical Name</div>
+                                <div class="detail-value">{{ chemical.name }}</div>
+                            </div>
+                            <div class="detail-group">
+                                <div class="detail-label">Chemical Description</div>
+                                <div class="detail-value">{{ chemical.chemical_description or 'Not available' }}</div>
+                            </div>
+                            <div class="detail-group">
+                                <div class="detail-label">Hazard Classification</div>
+                                <div class="detail-value">{{ chemical.hazard_classification or 'Not available' }}</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Secondary Information Row -->
+                        <div class="secondary-info">
+                            <div class="detail-group">
+                                <div class="detail-label">CAS Number</div>
+                                <div class="detail-value">{{ chemical.cas_number or 'Not available' }}</div>
+                            </div>
+                            <div class="detail-group">
+                                <div class="detail-label">Chemical Formula</div>
+                                <div class="detail-value">{{ chemical.chemical_formula or 'Not available' }}</div>
+                            </div>
+                            <div class="detail-group">
+                                <div class="detail-label">Molecular Weight</div>
+                                <div class="detail-value">{{ chemical.molecular_weight or 'Not available' }}</div>
+                            </div>
+                            <div class="detail-group">
+                                <div class="detail-label">Physical State</div>
+                                <div class="detail-value">{{ chemical.physical_state or 'Not available' }}</div>
+                            </div>
+                            <div class="detail-group">
+                                <div class="detail-label">Signal Word</div>
+                                <div class="detail-value">{{ chemical.signal_word or 'Not available' }}</div>
+                            </div>
+                            <div class="detail-group">
+                                <div class="detail-label">SDS</div>
+                                <div class="detail-value">
+                                    {% if chemical.sds_link %}
+                                        <a href="{{ chemical.sds_link }}" target="_blank">View Safety Data Sheet</a>
+                                    {% else %}
+                                        Not available
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-group">
+                            <div class="detail-label">Location</div>
+                            <div class="detail-value">
+                                {{ chemical.building_name }} - 
+                                Lab Room: {{ chemical.lab_room_number }}, 
+                                Locker: {{ chemical.locker_number }}
+                            </div>
+                        </div>
+                        
+                        <div class="quantity-group">
+                            <div class="quantity-details-grid">
+                                <div class="detail-group">
+                                    <div class="detail-label">Quantity</div>
+                                    <div class="detail-value">{{ chemical.quantity }}</div>
+                                </div>
+                                <div class="detail-group">
+                                    <div class="detail-label">Reorder Quantity</div>
+                                    <div class="detail-value">{{ chemical.reorder_quantity }}</div>
+                                </div>
+                                <div class="detail-group">
+                                    <div class="detail-label">Unit of Measure</div>
+                                    <div class="detail-value">{{ chemical.unit_of_measure }}</div>
+                                </div>
+                            </div>
+                            <div class="quantity-actions">
+                                <form method="post" action="/search/chemical/{{ chemical.id }}/receive">
+                                    <input type="hidden" name="scroll_position" value="{{ scroll_position }}">
+                                    <button type="submit" class="btn">Receive Material</button>
+                                </form>
+                                <form method="post" action="/search/chemical/{{ chemical.id }}/checkout">
+                                    <input type="hidden" name="scroll_position" value="{{ scroll_position }}">
+                                    <button type="submit" class="btn">Check Out Material</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inventory Update Form (shown when receiving or checking out) -->
+                {% if show_inventory_form %}
+                <div class="inventory-dialog-container">
+                    <div class="inventory-dialog">
+                        <div class="inventory-dialog-header">
+                            <h4 class="inventory-dialog-title">{{ action_title }}</h4>
+                        </div>
+                        <div class="inventory-dialog-content">
+                            <form method="post" action="/search/chemical/{{ chemical.id }}/update_inventory">
+                                <input type="hidden" name="action" value="{{ action }}">
+                                <input type="hidden" name="scroll_position" value="{{ scroll_position }}">
+                                <div class="form-group">
+                                    <label for="quantity" class="form-label">Quantity ({{ chemical.unit_of_measure }})</label>
+                                    <input type="number" id="quantity" name="quantity" class="form-control" min="0.01" step="0.01" required placeholder="Enter quantity">
+                                </div>
+                                {% if error %}
+                                <div class="inventory-error">{{ error }}</div>
+                                {% endif %}
+                                <div class="inventory-dialog-actions">
+                                    <a href="/search/chemical/{{ chemical.id }}?scroll_position={{ scroll_position }}" class="btn">Cancel</a>
+                                    <button type="submit" class="btn btn-primary">{{ action_button }}</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </main>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Use the incoming scroll position value from URL parameters 
+            // for form submissions if we need to return to the details page
+            let scrollPosition = "{{scroll_position}}";
+            
+            // Make sure all forms preserve scroll position in hidden inputs
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                let hasScrollInput = false;
+                
+                // Check if form already has a scroll_position input
+                const inputs = form.querySelectorAll('input[name="scroll_position"]');
+                if (inputs.length > 0) {
+                    inputs.forEach(input => {
+                        input.value = scrollPosition;
+                        hasScrollInput = true;
+                    });
+                }
+                
+                // If no scroll input exists, add one
+                if (!hasScrollInput) {
+                    const scrollInput = document.createElement('input');
+                    scrollInput.type = 'hidden';
+                    scrollInput.name = 'scroll_position';
+                    scrollInput.value = scrollPosition;
+                    form.appendChild(scrollInput);
+                }
+            });
+            
+            // Set focus to quantity field if inventory form is shown
+            const quantityField = document.getElementById('quantity');
+            if (quantityField) {
+                quantityField.focus();
+            }
+        });
+        
+        // Set up click handlers for the back to search links after window is fully loaded
+        window.addEventListener('load', function() {           
+            // Add click handler to the back button
+            document.getElementById('back-to-search').addEventListener('click', function(e) {
+                e.preventDefault();
+                setTimeout(function() {
+                    window.location.href = "/search"; 
+                }, 100);
+            });
+            
+            // Same for any other search links
+            document.querySelectorAll('a[href^="/search"]').forEach(function(link) {
+                if (link.id !== 'back-to-search') { // Skip the one we already handled
+                    link.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        setTimeout(function() {
+                            window.location.href = link.getAttribute('href');
+                        }, 100);
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

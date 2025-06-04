@@ -1,0 +1,3 @@
+# This file is included for consistency with other containers
+# The nginx container doesn't require Python dependencies
+# but we include this file to maintain a consistent structure

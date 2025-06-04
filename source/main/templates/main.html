@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChemTrack - Main</title>
+    <link rel="stylesheet" href="{{static_url}}/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header - pulled from shared templates -->
+        {{ header_html|safe }}
+
+        <!-- Main Content -->
+        <div class="main-container">
+            <!-- Navigation Sidebar - pulled from shared templates -->
+            {{ navigation_html|safe }}
+
+            <!-- Content Area -->
+            <main class="content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Welcome to ChemTrack</h2>
+                    </div>
+                    <p>Chemical Inventory Management System</p>
+                    <p>Select an option from the navigation menu to get started.</p>
+                    
+                    <!-- User Preferences Section -->
+                    <div class="user-preferences">
+                        <h3>Your Lab Information</h3>
+                        <div class="preference-item">
+                            <strong>Building:</strong> {{ user_building }}
+                        </div>
+                        <div class="preference-item">
+                            <strong>Lab Room:</strong> {{ user_lab_room }}
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChemTrack - Chemical Search</title>
+    <link rel="stylesheet" href="{{static_url}}/styles.css">
+    <link rel="stylesheet" href="{{static_url}}/search-styles.css">
+    <script>
+    // IMMEDIATE EXECUTION - This runs as soon as the script is parsed
+    console.log('SCRIPT EXECUTING IMMEDIATELY');
+    
+    // Check for scroll position in localStorage right away
+    try {
+        var savedPos = localStorage.getItem('chemtrack_search_scroll');
+        console.log('IMMEDIATE CHECK: Found saved position in localStorage:', savedPos);
+    } catch (e) {
+        console.error('Error checking localStorage:', e);
+    }
+    </script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header - pulled from shared templates -->
+        {{ header_html|safe }}
+
+        <!-- Main Content -->
+        <div class="main-container">
+            <!-- Navigation Sidebar - pulled from shared templates -->
+            {{ navigation_html|safe }}
+
+            <!-- Content Area -->
+            <main class="content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Chemical Search</h2>
+                    </div>
+                    
+                    <!-- Search Form -->
+                    <form method="post" action="/search" class="search-form" id="search-form" onsubmit="localStorage.removeItem('chemtrack_search_scroll');">
+                        <div class="search-filters">
+                            <div class="form-group">
+                                <label for="chemical_name" class="form-label">Chemical Name</label>
+                                <input type="text" id="chemical_name" name="chemical_name" class="form-control" placeholder="Enter chemical name" value="{{ chemical_name }}">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="building_name" class="form-label">Building Name</label>
+                                <select id="building_name" name="building_name" class="form-control">
+                                    <option value="">-- Select Building --</option>
+                                    {% for building in buildings %}
+                                    <option value="{{ building }}" {% if building == building_name %}selected{% endif %}>{{ building }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="lab_room" class="form-label">Lab Room Number</label>
+                                <select id="lab_room" name="lab_room" class="form-control" {% if not building_name %}disabled{% endif %}>
+                                    <option value="">-- Select Lab Room --</option>
+                                    {% for room in lab_rooms %}
+                                    <option value="{{ room }}" {% if room|string == lab_room %}selected{% endif %}>{{ room }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="locker" class="form-label">Locker Number</label>
+                                <input type="number" id="locker" name="locker" class="form-control" placeholder="Enter locker number" value="{{ locker }}">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="hazard_classification" class="form-label">Hazard Classification</label>
+                                <input type="text" id="hazard_classification" name="hazard_classification" class="form-control" placeholder="Enter hazard classification" value="{{ hazard_classification }}">
+                            </div>
+                        </div>
+                        
+                        <div class="search-actions">
+                            <button type="submit" class="btn btn-primary">Search</button>
+                        </div>
+                    </form>
+
+                    <!-- Error Message (if any) -->
+                    {% if error %}
+                    <div class="text-error mb-3">{{ error }}</div>
+                    {% endif %}
+                    
+                    <!-- Store chemicals data in a hidden input -->
+                    <input type="hidden" id="chemicals-data" value="{{ chemicals_json|safe }}">
+                    
+                    <!-- Search Results -->
+                    {% if results %}
+                    <h3 class="mb-2">Search Results</h3>
+                    <div id="grid-div" class="grid-container">
+                        <table class="results-grid">
+                            <thead>
+                                <tr>
+                                    <th>
+                                        <a href="/search?sort=name&direction={% if sort_column == 'name' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link">
+                                            Name
+                                            {% if sort_column == 'name' %}
+                                                <span class="sort-icon">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="/search?sort=uom&direction={% if sort_column == 'uom' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link">
+                                            UOM
+                                            {% if sort_column == 'uom' %}
+                                                <span class="sort-icon">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="/search?sort=qty&direction={% if sort_column == 'qty' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link">
+                                            Qty
+                                            {% if sort_column == 'qty' %}
+                                                <span class="sort-icon">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="/search?sort=reorder_qty&direction={% if sort_column == 'reorder_qty' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link">
+                                            Reorder Qty
+                                            {% if sort_column == 'reorder_qty' %}
+                                                <span class="sort-icon">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="/search?sort=bld_name&direction={% if sort_column == 'bld_name' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link">
+                                            Bld Name
+                                            {% if sort_column == 'bld_name' %}
+                                                <span class="sort-icon">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="/search?sort=lab_room&direction={% if sort_column == 'lab_room' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link">
+                                            Lab Room
+                                            {% if sort_column == 'lab_room' %}
+                                                <span class="sort-icon">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="/search?sort=locker&direction={% if sort_column == 'locker' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link">
+                                            Locker
+                                            {% if sort_column == 'locker' %}
+                                                <span class="sort-icon">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="/search?sort=cas_number&direction={% if sort_column == 'cas_number' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link">
+                                            CAS Number
+                                            {% if sort_column == 'cas_number' %}
+                                                <span class="sort-icon">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="/search?sort=chemical_formula&direction={% if sort_column == 'chemical_formula' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link">
+                                            Chemical Formula
+                                            {% if sort_column == 'chemical_formula' %}
+                                                <span class="sort-icon">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="/search?sort=signal_word&direction={% if sort_column == 'signal_word' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link">
+                                            Signal Word
+                                            {% if sort_column == 'signal_word' %}
+                                                <span class="sort-icon">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="/search?sort=physical_state&direction={% if sort_column == 'physical_state' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}" class="sort-link">
+                                            Physical State
+                                            {% if sort_column == 'physical_state' %}
+                                                <span class="sort-icon">{% if sort_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="results-body">
+                                {% for item in results %}
+                                <tr id="tablerow{{item.id}}">
+                                    <td><a href="/search/chemical/{{ item.id }}" class="chemical-link" data-id="{{ item.id }}">{{ item.name }}</a></td>
+                                    <td>{{ item.unit_of_measure }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>{{ item.reorder_quantity }}</td>
+                                    <td>{{ item.building_name }}</td>
+                                    <td>{{ item.lab_room_number }}</td>
+                                    <td>{{ item.locker_number }}</td>
+                                    <td>{{ item.cas_number }}</td>
+                                    <td>{{ item.chemical_formula }}</td>
+                                    <td>{{ item.signal_word }}</td>
+                                    <td>{{ item.physical_state }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% elif request.method == 'POST' %}
+                    <div class="no-results">No chemicals found matching your search criteria.</div>
+                    {% endif %}
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <script>
+    // This code runs as soon as it's encountered in the page
+    console.log("MAIN SCRIPT BLOCK RUNNING");
+    
+    // IMPORTANT: Restore scroll position - Called directly in the script tag
+    (function() {
+        console.log("IIFE RUNNING - CHECKING FOR SAVED SCROLL POSITION");
+        try {
+            // Get saved position directly
+            var savedPosition = localStorage.getItem('chemtrack_search_scroll');
+            console.log("Found saved scroll position:", savedPosition);
+            
+            if (savedPosition && !isNaN(parseInt(savedPosition))) {
+                var targetPosition = parseInt(savedPosition);
+                console.log("Attempting to restore scroll to position:", targetPosition);
+                
+                if (targetPosition > 0) {
+                    // Try scrolling now (may not work if body not loaded)
+                    try {
+                        //window.scrollTo(0, targetPosition);
+                        var objDiv = document.getElementById('grid-div');
+                        objDiv.scrollTop = targetPosition;
+                        console.log("Initial scroll attempt complete");
+                    } catch (e) {
+                        console.error("Error in initial scroll attempt:", e);
+                    }                    
+                }
+            } else {
+                console.log("No valid scroll position found or position is 0");
+            }
+        } catch (e) {
+            console.error("Error restoring scroll position:", e);
+        }
+    })(); // IIFE - execute immediately
+    
+    // DOM ready handler - for less critical UI operations
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM CONTENT LOADED - Setting up UI interactions");
+        
+        // Function to clear saved scroll position when filters change
+        const clearScrollPosition = () => {
+            console.log("Clearing saved scroll position due to filter change");
+            localStorage.removeItem('chemtrack_search_scroll');
+        };
+        
+        // Add event listeners to all filter inputs to clear scroll position when they change
+        const chemicalNameInput = document.getElementById('chemical_name');
+        if (chemicalNameInput) {
+            chemicalNameInput.addEventListener('change', clearScrollPosition);
+        }
+        
+        const hazardClassInput = document.getElementById('hazard_classification');
+        if (hazardClassInput) {
+            hazardClassInput.addEventListener('change', clearScrollPosition);
+        }
+        
+        // Lab room selection logic
+        const buildingSelect = document.getElementById('building_name');
+        const labRoomSelect = document.getElementById('lab_room');
+        const lockerInput = document.getElementById('locker');
+        
+        // Function to load lab rooms for a specified building
+        const loadLabRooms = function(selectedBuilding) {
+            if (!selectedBuilding) {
+                labRoomSelect.innerHTML = '<option value="">-- Select Lab Room --</option>';
+                labRoomSelect.disabled = true;
+                if (lockerInput) lockerInput.value = '';
+                console.log("No building selected, disabling lab room dropdown");
+                return;
+            }
+            
+            labRoomSelect.disabled = false;
+            
+            console.log(`Fetching lab rooms for building: ${selectedBuilding}`);
+            fetch(`/search/get_lab_rooms?building=${encodeURIComponent(selectedBuilding)}`)
+                .then(response => {
+                    console.log('Response received:', response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Lab rooms data:', data);
+                    if (data.success) {
+                        labRoomSelect.innerHTML = '<option value="">-- Select Lab Room --</option>';
+                        if (data.lab_rooms && data.lab_rooms.length > 0) {
+                            console.log(`Adding ${data.lab_rooms.length} lab rooms to dropdown`);
+                            data.lab_rooms.forEach(room => {
+                                const option = document.createElement('option');
+                                option.value = room;
+                                option.textContent = room;
+                                // If there's a pre-selected lab room, select it
+                                if (room == "{{ lab_room }}") {
+                                    option.selected = true;
+                                }
+                                labRoomSelect.appendChild(option);
+                            });
+                            console.log('Lab room dropdown updated successfully');
+                        } else {
+                            console.log('No lab rooms returned for this building');
+                        }
+                    } else {
+                        console.error('Error in lab rooms response:', data);
+                    }
+                })
+                .catch(error => console.error('Error fetching lab rooms:', error));
+        };
+        
+        if (buildingSelect && labRoomSelect) {
+            // Add event listener to clear scroll position when building changes
+            buildingSelect.addEventListener('change', clearScrollPosition);
+            buildingSelect.addEventListener('change', function() {
+                loadLabRooms(buildingSelect.value);
+            });
+            
+            // If a building is pre-selected when the page loads, load its lab rooms
+            if (buildingSelect.value) {
+                console.log("Building pre-selected on page load, fetching lab rooms");
+                loadLabRooms(buildingSelect.value);
+            }
+        }
+        
+        if (labRoomSelect && lockerInput) {
+            labRoomSelect.addEventListener('change', function() {
+                lockerInput.value = '';
+                clearScrollPosition();
+            });
+            
+            // Add event listener to locker input
+            lockerInput.addEventListener('change', clearScrollPosition);
+        }
+        
+        // Check for logout - clear scroll position when leaving the page
+        window.addEventListener('beforeunload', function() {
+            // We'll keep the scroll position for navigation to chemical details
+            // but clear it if navigating away to other pages
+            const linkClicked = localStorage.getItem('chemtrack_link_clicked');
+            if (!linkClicked) {
+                localStorage.removeItem('chemtrack_search_scroll');
+            }
+            localStorage.removeItem('chemtrack_link_clicked');
+        });
+        
+        // Store scroll position when clicking on chemical links
+        console.log("scroll saving");
+        const chemicalLinks = document.querySelectorAll('.chemical-link');
+        chemicalLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault(); // Stop default navigation
+                
+                var objDiv = document.getElementById('grid-div');
+                const currentScrollY = Math.round(objDiv.scrollTop);
+                console.log('Chemical link clicked, saving scroll position:', currentScrollY);
+                
+                localStorage.setItem('chemtrack_search_scroll', currentScrollY);
+                localStorage.setItem('chemtrack_link_clicked', 'true');
+                
+                // Navigate after a small delay to ensure storage is updated
+                setTimeout(function() {
+                    window.location.href = link.getAttribute('href');
+                }, 50);
+            });
+        });
+        
+        // Store scroll position when clicking on sort links
+        const sortLinks = document.querySelectorAll('.sort-link');
+        sortLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const currentScrollY = Math.round(window.scrollY);
+                console.log('Sort link clicked, saving position:', currentScrollY);
+                
+                // Save the scroll position to localStorage
+                localStorage.setItem('chemtrack_search_scroll', currentScrollY);
+                localStorage.setItem('chemtrack_link_clicked', 'true');
+                
+                // Navigate after a small delay
+                setTimeout(function() {
+                    window.location.href = link.getAttribute('href');
+                }, 50);
+            });
+        });
+        
+        // Detect login status change (logout)
+        // Try to find logout link and attach listener
+        const logoutLinks = document.querySelectorAll('a[href*="logout"], button[onclick*="logout"]');
+        logoutLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                console.log('Logout detected, clearing scroll position');
+                localStorage.removeItem('chemtrack_search_scroll');
+            });
+        });
+    });
+    
+    </script>
+</body>
+</html>

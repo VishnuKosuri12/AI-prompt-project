@@ -1,0 +1,42 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ECS Service Connect discovery - comment out services that don't have metrics endpoints
+  - job_name: 'service-connect'
+    static_configs:
+      - targets: 
+        # Include only the services that have /metrics endpoints
+        # For now, only include Prometheus itself as we know it works
+        - 'prometheus:9090'
+        # The following services are commented out until they're confirmed to have metrics endpoints
+        # - 'backend:8000'
+        # - 'login:8000'
+        # - 'main:8000'
+        # - 'nginx:80'
+        # - 'search:8000'
+        # - 'admin:8000'
+        # - 'recipes:8000'
+        # - 'reports:8000'
+        # - 'secrets:8000'
+        # - 'shared-templates:8000'
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '(.*):.*'
+        target_label: service_name
+        replacement: '$1'
+
+remote_write:
+  - url: ${PrometheusWorkspaceEndpoint}remote_write
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 200
+      capacity: 2500
+    sigv4:
+      region: ${AWS::Region}

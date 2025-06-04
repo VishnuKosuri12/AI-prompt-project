@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChemTrack - User Account</title>
+    <link rel="stylesheet" href="{{static_url}}/styles.css">
+    <style>
+        /* Modal dialog styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background-color: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 500px;
+            padding: var(--spacing-lg);
+            position: relative;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-lg);
+            border-bottom: 1px solid var(--gray-light);
+            padding-bottom: var(--spacing-md);
+        }
+        
+        .modal-title {
+            margin: 0;
+            color: var(--primary-color);
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--gray-dark);
+        }
+        
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-lg);
+            padding-top: var(--spacing-md);
+            border-top: 1px solid var(--gray-light);
+        }
+        
+        /* Form layout */
+        .form-section {
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .form-section-title {
+            font-size: 1.1rem;
+            color: var(--secondary-color);
+            margin-bottom: var(--spacing-md);
+            font-weight: 500;
+        }
+        
+        .form-row {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .form-col {
+            flex: 1;
+        }
+        
+        /* Error message */
+        .error-message {
+            background-color: rgba(211, 47, 47, 0.1);
+            border-left: 3px solid var(--error-color);
+            color: var(--error-color);
+            padding: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+            border-radius: var(--border-radius);
+        }
+        
+        /* Password change link */
+        .password-change-link {
+            display: inline-block;
+            margin-top: var(--spacing-md);
+            color: var(--primary-color);
+            text-decoration: underline;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header - pulled from shared templates -->
+        {{ header_html|safe }}
+
+        <!-- Main Content -->
+        <div class="main-container">
+            <!-- Navigation Sidebar - pulled from shared templates -->
+            {{ navigation_html|safe }}
+
+            <!-- Content Area -->
+            <main class="content">
+                <div class="modal-overlay">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="modal-title">User Account</h2>
+                            <a href="/" class="modal-close" id="close-btn">&times;</a>
+                        </div>
+                        
+                        {% if error %}
+                        <div class="error-message">
+                            {{ error }}
+                        </div>
+                        {% endif %}
+                        
+                        <form action="/user_account" method="POST">
+                            <div class="form-section">
+                                <div class="form-section-title">Account Information</div>
+                                
+                                <div class="form-group">
+                                    <label for="username" class="form-label">Username</label>
+                                    <input type="text" id="username" class="form-control" value="{{ username }}" readonly>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="email" class="form-label">Email Address</label>
+                                    <input type="email" id="email" name="email" class="form-control" value="{{ email }}" required>
+                                </div>
+                                
+                                <a href="#" class="password-change-link" id="change-password-link">Change Password</a>
+                            </div>
+                            
+                            <div class="form-section">
+                                <div class="form-section-title">User Preferences</div>
+                                
+                                <div class="form-row">
+                                    <div class="form-col">
+                                        <div class="form-group">
+                                            <label for="building" class="form-label">Building</label>
+                                            <select id="building" name="building" class="form-control">
+                                                <option value="">Select Building</option>
+                                                {% for b in buildings %}
+                                                <option value="{{ b }}" {% if b == building %}selected{% endif %}>{{ b }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-col">
+                                        <div class="form-group">
+                                            <label for="lab_room" class="form-label">Lab Room</label>
+                                            <select id="lab_room" name="lab_room" class="form-control">
+                                                <option value="">Select Lab Room</option>
+                                                {% for lr in lab_rooms %}
+                                                <option value="{{ lr }}" {% if lr|string == lab_room|string %}selected{% endif %}>{{ lr }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group" style="margin-top: 20px;">
+                                    <label class="form-label">Reorder Notification</label>
+                                    <div class="radio-group">
+                                        <label class="radio-label">
+                                            <input type="radio" name="reorder_notification" value="on" {% if reorder_notification == 'on' %}checked{% endif %}> On
+                                        </label>
+                                        <label class="radio-label" style="margin-left: 20px;">
+                                            <input type="radio" name="reorder_notification" value="off" {% if reorder_notification != 'on' %}checked{% endif %}> Off
+                                        </label>
+                                    </div>
+                                    <div class="form-text" style="font-size: 0.85em; color: #666; margin-top: 5px;">
+                                        Receive email notifications when chemicals fall below reorder quantities
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="modal-footer">
+                                <a href="/" class="btn btn-secondary" id="cancel-btn">Cancel</a>
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    <script>
+        // Backend API URL and API key
+        const BACKEND_API_URL = "{{ backend_api_url }}";
+        const API_KEY = "{{ api_key }}";
+        
+        // Handle cancel and close buttons to prevent form submission
+        document.getElementById('cancel-btn').addEventListener('click', function(e) {
+            // Just navigate to home page without form submission
+            window.location.href = '/';
+            e.preventDefault();
+        });
+        
+        document.getElementById('close-btn').addEventListener('click', function(e) {
+            // Just navigate to home page without form submission
+            window.location.href = '/';
+            e.preventDefault();
+        });
+        
+        // Handle building change to update lab room options
+        document.getElementById('building').addEventListener('change', function() {
+            const buildingValue = this.value;
+            const labRoomSelect = document.getElementById('lab_room');
+            
+            // Clear current options
+            labRoomSelect.innerHTML = '<option value="">Select Lab Room</option>';
+            
+            if (buildingValue) {
+                // Fetch lab rooms for selected building
+                fetch(`${BACKEND_API_URL}/backend/lab_rooms/${buildingValue}`, {
+                    headers: { 'X-API-Key': API_KEY }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            data.lab_rooms.forEach(labRoom => {
+                                const option = document.createElement('option');
+                                option.value = labRoom;
+                                option.textContent = labRoom;
+                                labRoomSelect.appendChild(option);
+                            });
+                        }
+                    })
+                    .catch(error => console.error('Error fetching lab rooms:', error));
+            }
+        });
+        
+        // Password change link
+        document.querySelector('.password-change-link').addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Confirm the user wants to change their password
+            if (confirm('This will log you out and require you to set a new password on next login. Continue?')) {               
+                // Send request to set password reset flag using our proxy endpoint
+                const endpoint = '/set_password_reset';
+                
+                // Use fetch with more detailed error handling
+                fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json'
+                    }
+                    // No need to send username, server will use the session
+                })
+                .then(response => {
+                   if (!response.ok) {
+                       throw new Error(`HTTP error! Status: ${response.status}`);
+                   }
+                   return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        // Redirect to logout
+                        window.location.href = '/logout';
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    //console.error('Error:', error);
+                    alert('An error occurred while processing your request: ' + error);
+                });
+            }
+        });
+    </script>
+</body>
+</html>

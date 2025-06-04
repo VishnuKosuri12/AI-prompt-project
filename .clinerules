@@ -1,0 +1,21 @@
+# Project Guidelines
+
+## Documentation
+- README.md should be kept up to date when changes are made
+
+## Coding Patterns
+- Project code should be written in Python
+- Pages should be developed using Flask with Uvicorn
+- APIs should be developed using FastAPI
+- All python code should be located under the /source folder
+- Infrastructure should be written using CloudFormation in yaml format
+- All CloudFormation files should be located under the /infrastructure folder
+- Deployment environment will be ECS Fargate
+- Each page should created as its own container
+- Each container should get its own subfolder under /source
+- Images will be stored in ECR
+- The base image for all containers will be: public.ecr.aws/docker/library/python:3.13.3
+- Docker should be used to build the container images
+- Data should be stored in PostgreSQL
+- Scripts should be created for all database structures and should be written for psql
+- All scripts should be placed in the scripts folder

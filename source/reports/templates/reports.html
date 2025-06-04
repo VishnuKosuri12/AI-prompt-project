@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChemTrack - Reporting</title>
+    <link rel="stylesheet" href="{{static_url}}/styles.css">
+    <link rel="stylesheet" href="{{static_url}}/reports-styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header - pulled from shared templates -->
+        {{ header_html|safe }}
+
+        <!-- Main Content -->
+        <div class="main-container">
+            <!-- Navigation Sidebar - pulled from shared templates -->
+            {{ navigation_html|safe }}
+
+            <!-- Content Area -->
+            <main class="content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Reporting</h2>
+                    </div>
+                    
+                    <div class="reports-container">
+                        <p>Select a report from the list below and click "Run Report" to generate the report.</p>
+                        
+                        <!-- Report Selection -->
+                        <div class="report-selection">
+                            <select id="report-selector" class="form-control">
+                                {% if reports %}
+                                    {% for report in reports %}
+                                        <option value="{{ report.report_id }}">{{ report.report_name }}</option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="" disabled>No reports available</option>
+                                {% endif %}
+                            </select>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="button-group">
+                            <button id="run-report" class="btn btn-primary" {% if not reports %}disabled{% endif %}>
+                                Run Report
+                            </button>
+                            <button id="export-excel" class="btn btn-success" disabled>
+                                Export to Excel
+                            </button>
+                        </div>
+                        
+                        <!-- Status Message -->
+                        <div id="status-message" class="status-message hidden"></div>
+                        
+                        <!-- Report Results -->
+                        <div id="report-results" class="hidden">
+                            <h3>Results</h3>
+                            <div class="reports-grid-container">
+                                <div class="reports-grid-wrapper">
+                                    <table id="reports-grid" class="reports-grid">
+                                        <thead id="report-headers"></thead>
+                                        <tbody id="report-data"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const reportSelector = document.getElementById('report-selector');
+            const runReportBtn = document.getElementById('run-report');
+            const exportExcelBtn = document.getElementById('export-excel');
+            const statusMessage = document.getElementById('status-message');
+            const reportResults = document.getElementById('report-results');
+            const reportHeaders = document.getElementById('report-headers');
+            const reportData = document.getElementById('report-data');
+            
+            let currentReportId = reportSelector.value;
+            let lastReportData = null;
+            
+            // Update current report ID when selection changes
+            reportSelector.addEventListener('change', function() {
+                currentReportId = this.value;
+                // Reset results when selection changes
+                reportResults.classList.add('hidden');
+                exportExcelBtn.disabled = true;
+                statusMessage.classList.add('hidden');
+            });
+            
+            // Run report button click handler
+            runReportBtn.addEventListener('click', function() {
+                if (!currentReportId) return;
+                
+                // Show loading state
+                runReportBtn.disabled = true;
+                runReportBtn.innerHTML = '<span class="loading-spinner"></span> Running...';
+                statusMessage.classList.add('hidden');
+                
+                // Call API to run report
+                fetch(`/reports/run/${currentReportId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            throw new Error(data.error || 'Failed to run report');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Save report data for potential export
+                    lastReportData = data;
+                    
+                    // Clear previous results
+                    reportHeaders.innerHTML = '';
+                    reportData.innerHTML = '';
+                    
+                    // Build table header
+                    const headerRow = document.createElement('tr');
+                    data.columns.forEach(column => {
+                        const th = document.createElement('th');
+                        th.textContent = column;
+                        headerRow.appendChild(th);
+                    });
+                    reportHeaders.appendChild(headerRow);
+                    
+                    // Build table rows
+                    if (data.rows.length === 0) {
+                        const noDataRow = document.createElement('tr');
+                        const noDataCell = document.createElement('td');
+                        noDataCell.colSpan = data.columns.length;
+                        noDataCell.textContent = 'No data found';
+                        noDataCell.classList.add('no-results');
+                        noDataRow.appendChild(noDataCell);
+                        reportData.appendChild(noDataRow);
+                    } else {
+                        data.rows.forEach(row => {
+                            const tr = document.createElement('tr');
+                            row.forEach(cell => {
+                                const td = document.createElement('td');
+                                td.textContent = cell !== null ? cell : '';
+                                tr.appendChild(td);
+                            });
+                            reportData.appendChild(tr);
+                        });
+                    }
+                    
+                    // Show results and enable export
+                    reportResults.classList.remove('hidden');
+                    exportExcelBtn.disabled = false;
+                    
+                    // Show success message
+                    statusMessage.textContent = `Report generated successfully. ${data.row_count} rows returned.`;
+                    statusMessage.classList.remove('hidden', 'status-error');
+                    statusMessage.classList.add('status-success');
+                })
+                .catch(error => {
+                    // Show error message
+                    statusMessage.textContent = `Error: ${error.message}`;
+                    statusMessage.classList.remove('hidden', 'status-success');
+                    statusMessage.classList.add('status-error');
+                    
+                    // Hide results
+                    reportResults.classList.add('hidden');
+                    exportExcelBtn.disabled = true;
+                })
+                .finally(() => {
+                    // Reset button state
+                    runReportBtn.disabled = false;
+                    runReportBtn.innerHTML = 'Run Report';
+                });
+            });
+            
+            // Export to Excel button click handler
+            exportExcelBtn.addEventListener('click', function() {
+                if (!currentReportId) return;
+                
+                // Show loading state
+                exportExcelBtn.disabled = true;
+                exportExcelBtn.innerHTML = '<span class="loading-spinner"></span> Exporting...';
+                
+                // Open in a new window/tab for the download
+                window.open(`/reports/export/${currentReportId}`, '_blank');
+                
+                // Reset button after a delay
+                setTimeout(() => {
+                    exportExcelBtn.disabled = false;
+                    exportExcelBtn.innerHTML = 'Export to Excel';
+                }, 1000);
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for ChemTrack Database Network Load Balancer'
+
+Parameters:
+  AppName:
+    Type: String
+    Description: Name of the application
+    Default: chemtrack
+
+  VpcId:
+    Type: String
+    Description: VPC ID where the NLB will be deployed
+    Default: vpc-019e35a7f8ca205e5
+
+  IntranetSubnet1:
+    Type: String
+    Description: First intranet subnet ID for the NLB
+    Default: subnet-0ee959776d1683aa5
+
+  IntranetSubnet2:
+    Type: String
+    Description: Second intranet subnet ID for the NLB
+    Default: subnet-07257f93f815ce77c
+
+  DatabaseIP:
+    Type: String
+    Description: IP address of the database for the target group
+    Default: ''
+
+Resources:
+  DatabaseNLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${AppName}-db-nlb
+      Type: network
+      Scheme: internal
+      Subnets:
+        - !Ref IntranetSubnet1
+        - !Ref IntranetSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-db-nlb
+
+  DatabaseTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${AppName}-db-tg
+      Port: 5432
+      Protocol: TCP
+      VpcId: !Ref VpcId
+      TargetType: ip
+      Targets:
+        - Id: !Ref DatabaseIP
+          Port: 5432
+      HealthCheckEnabled: true
+      HealthCheckPort: 5432
+      HealthCheckProtocol: TCP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-db-tg
+
+  DatabaseListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref DatabaseNLB
+      Port: 5432
+      Protocol: TCP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref DatabaseTargetGroup
+
+  DatabaseDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: 767397980456.aws.glpoly.net.
+      Name: "ctrds.767397980456.aws.glpoly.net"
+      Type: CNAME
+      TTL: 300
+      ResourceRecords:
+        - !GetAtt DatabaseNLB.DNSName
+
+Outputs:
+  DatabaseNLBArn:
+    Description: ARN of the database network load balancer
+    Value: !Ref DatabaseNLB
+    Export:
+      Name: !Sub ${AppName}-db-nlb-arn
+
+  DatabaseNLBDNSName:
+    Description: DNS name of the database network load balancer
+    Value: !GetAtt DatabaseNLB.DNSName
+    Export:
+      Name: !Sub ${AppName}-db-nlb-dns-name
+
+
+  DatabaseTargetGroupArn:
+    Description: ARN of the database target group
+    Value: !Ref DatabaseTargetGroup
+    Export:
+      Name: !Sub ${AppName}-db-tg-arn
+
+  DatabaseListenerArn:
+    Description: ARN of the database listener
+    Value: !Ref DatabaseListener
+    Export:
+      Name: !Sub ${AppName}-db-listener-arn
+
+  DatabaseDNSRecordName:
+    Description: DNS record name for the database
+    Value: "ctrds.767397980456.aws.glpoly.net"
+    Export:
+      Name: !Sub ${AppName}-db-dns-record-name

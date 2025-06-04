@@ -1,0 +1,1 @@
+import sys, os; sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); from fastapi.testclient import TestClient; from app.main import app; client = TestClient(app); response = client.post("/backend/login", json={"username": "testuser", "password": "password123"}); print(f"Status code: {response.status_code}"); print(f"Response body: {response.text}")

@@ -1,0 +1,141 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for the ChemTrack shared templates container'
+
+Parameters:
+  AppName:
+    Type: String
+    Default: "chemtrack"
+    Description: Name of the application 
+  AppURL:
+    Type: String
+    Description: root application url
+    Default: "chemtrack.767397980456.aws.glpoly.net"
+  DesiredCount:
+    Type: Number
+    Default: 1
+    Description: Desired count of containers
+  VpcId:
+    Type: String
+    Description: VPC ID where the ECS cluster will be deployed
+    Default: vpc-019e35a7f8ca205e5
+  PrivateSubnet1:
+    Type: String
+    Description: First private subnet ID for the ECS cluster
+    Default: subnet-08de8ae010ebfa1f3
+  PrivateSubnet2:
+    Type: String
+    Description: Second private subnet ID for the ECS cluster
+    Default: subnet-0205ddf1053073b5c
+
+Resources:
+  # Task Definition
+  SharedTemplatesTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${AppName}-shared-templates"
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !ImportValue 
+        Fn::Sub: "${AppName}-ecs-task-execution-role-arn"
+      TaskRoleArn: !ImportValue 
+        Fn::Sub: "${AppName}-ecs-task-role-arn"
+      ContainerDefinitions:
+        - Name: !Sub "${AppName}-shared-templates"
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${AppName}/shared-templates:latest"
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8000
+              HostPort: 8000
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "/ecs/${AppName}-shared-templates"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+          Environment:
+            - Name: BASE_URL
+              Value: !Ref AppURL
+            - Name: SECRET_KEY
+              Value: '64df77320c1b5b56396028e0dfc01deb'
+
+  # CloudWatch Logs Group
+  SharedTemplatesLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${AppName}-shared-templates"
+      RetentionInDays: 14
+
+  # ECS Service
+  SharedTemplatesService:
+    Type: AWS::ECS::Service
+    DependsOn: SharedTemplatesListenerRule
+    Properties:
+      ServiceName: !Sub "${AppName}-shared-templates"
+      Cluster: !ImportValue 
+        Fn::Sub: "${AppName}-cluster-name"
+      LaunchType: FARGATE
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DesiredCount: !Ref DesiredCount
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - !ImportValue 
+              Fn::Sub: "${AppName}-ecs-security-group-id"
+          Subnets:
+            - !Ref PrivateSubnet1
+            - !Ref PrivateSubnet2
+      TaskDefinition: !Ref SharedTemplatesTaskDefinition
+      LoadBalancers:
+        - ContainerName: !Sub "${AppName}-shared-templates"
+          ContainerPort: 8000
+          TargetGroupArn: !Ref SharedTemplatesTargetGroup
+
+  # Target Group
+  SharedTemplatesTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      TargetType: ip
+      Name: !Sub "${AppName}-shared-templates"
+      Port: 8000
+      Protocol: HTTP
+      UnhealthyThresholdCount: 3
+      VpcId: !Ref VpcId
+
+  # Listener Rule
+  SharedTemplatesListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref SharedTemplatesTargetGroup
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /shared-templates*
+      ListenerArn: !ImportValue 
+        Fn::Sub: "${AppName}-https-listener-arn"
+      Priority: 50
+
+Outputs:
+  SharedTemplatesServiceArn:
+    Description: ARN of the shared templates service
+    Value: !Ref SharedTemplatesService
+    Export:
+      Name: !Sub "${AppName}-shared-templates-service-arn"
+
+  SharedTemplatesTargetGroupArn:
+    Description: ARN of the shared templates target group
+    Value: !Ref SharedTemplatesTargetGroup
+    Export:
+      Name: !Sub "${AppName}-shared-templates-target-group-arn"

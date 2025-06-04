@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChemTrack - {% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="{{static_url}}/styles.css">
+    {% block additional_styles %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        {% include 'shared/header.html' %}
+
+        <!-- Main Content -->
+        <div class="main-container">
+            {% include 'shared/navigation.html' %}
+
+            <!-- Content Area -->
+            <main class="content">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

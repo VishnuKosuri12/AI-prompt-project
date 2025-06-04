@@ -1,0 +1,217 @@
+/* Styles for the chemical search page */
+.search-form {
+    margin-bottom: var(--spacing-lg);
+}
+
+.search-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.search-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--spacing-md);
+}
+
+.results-grid {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: var(--spacing-lg);
+}
+
+.results-grid th,
+.results-grid td {
+    padding: var(--spacing-sm);
+    text-align: left;
+    border-bottom: 1px solid var(--gray-light);
+}
+
+.results-grid th {
+    background-color: var(--light-color);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.results-grid tbody tr:hover {
+    background-color: rgba(240, 244, 248, 0.5);
+}
+
+.sort-link {
+    display: flex;
+    align-items: center;
+    color: var(--secondary-color);
+    text-decoration: none;
+}
+
+.sort-link:hover {
+    color: var(--primary-color);
+}
+
+.sort-icon {
+    margin-left: var(--spacing-xs);
+    font-size: 0.8rem;
+}
+
+.grid-container {
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1px solid var(--gray-light);
+    border-radius: var(--border-radius);
+}
+
+.no-results {
+    padding: var(--spacing-lg);
+    text-align: center;
+    color: var(--gray-dark);
+}
+
+.chemical-link {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+.chemical-link:hover {
+    text-decoration: underline;
+}
+
+/* Chemical Details Modal Styles */
+.modal-backdrop {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 100;
+    overflow-y: auto;
+}
+
+/* Inventory Update Dialog Styles */
+.inventory-dialog {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 300px;
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 102; /* Above main modal */
+    padding: var(--spacing-md);
+}
+
+.inventory-dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.inventory-dialog-title {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.inventory-dialog-content {
+    margin-bottom: var(--spacing-md);
+}
+
+.inventory-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+}
+
+.inventory-error {
+    color: var(--error-color);
+    margin-top: var(--spacing-sm);
+    font-size: 0.9rem;
+}
+
+.inventory-success {
+    color: var(--success-color);
+    margin-top: var(--spacing-sm);
+    font-size: 0.9rem;
+}
+
+.modal {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 800px;
+    max-height: 90vh;
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 101;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--gray-light);
+    background-color: var(--light-color);
+}
+
+.modal-title {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--secondary-color);
+}
+
+.modal-body {
+    padding: var(--spacing-md);
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.detail-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.detail-label {
+    font-weight: bold;
+    margin-bottom: var(--spacing-xs);
+    color: var(--secondary-color);
+}
+
+.detail-value {
+    margin-bottom: var(--spacing-md);
+}
+
+.quantity-group {
+    padding: var(--spacing-md);
+    background-color: var(--light-color);
+    border-radius: var(--border-radius);
+    margin-top: var(--spacing-md);
+}
+
+.quantity-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+}

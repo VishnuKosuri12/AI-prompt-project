@@ -1,0 +1,757 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for ChemTrack Prometheus and Grafana monitoring'
+
+Parameters:
+  AppName:
+    Type: String
+    Description: Name of the application
+    Default: chemtrack
+  VpcId:
+    Type: String
+    Description: VPC ID where the ECS cluster will be deployed
+    Default: vpc-019e35a7f8ca205e5
+  PrivateSubnet1:
+    Type: String
+    Description: First private subnet ID for the ECS cluster
+    Default: subnet-08de8ae010ebfa1f3
+  PrivateSubnet2:
+    Type: String
+    Description: Second private subnet ID for the ECS cluster
+    Default: subnet-0205ddf1053073b5c
+  IntranetSubnet1:
+    Type: String
+    Description: First intranet subnet ID for the ALB
+    Default: subnet-0ee959776d1683aa5
+  IntranetSubnet2:
+    Type: String
+    Description: Second intranet subnet ID for the ALB
+    Default: subnet-07257f93f815ce77c
+  DesiredCount:
+    Type: Number
+    Description: Desired count of containers
+    Default: 1
+
+Resources:
+  # Amazon Managed Prometheus Workspace
+  PrometheusWorkspace:
+    Type: AWS::APS::Workspace
+    Properties:
+      Alias: !Sub "${AppName}-prometheus-workspace"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-prometheus-workspace"
+
+  # IAM Roles for Prometheus and Grafana
+  PrometheusRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonPrometheusFullAccess
+      Policies:
+        - PolicyName: !Sub "${AppName}-prometheus-policy"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecs:ListServices
+                  - ecs:ListTasks
+                  - ecs:DescribeTasks
+                  - ecs:DescribeServices
+                  - ecs:DescribeTaskDefinition
+                  - servicediscovery:ListServices
+                  - servicediscovery:GetService
+                  - servicediscovery:ListInstances
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/${AppName}*"
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/${AppName}*:log-stream:*"
+              - Effect: Allow
+                Action:
+                  - aps:RemoteWrite
+                  - aps:GetLabels
+                  - aps:GetMetricMetadata
+                  - aps:GetSeries
+                  - aps:QueryMetrics
+                Resource: !GetAtt PrometheusWorkspace.Arn
+
+  # Grafana admin password secret
+  GrafanaAdminPasswordSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${AppName}-grafana-admin-password"
+      Description: !Sub "Admin password for ${AppName} Grafana instance"
+      GenerateSecretString:
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\\'
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-grafana-admin-password"
+
+  GrafanaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "${AppName}-grafana-policy"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - aps:QueryMetrics
+                  - aps:GetLabels
+                  - aps:GetMetricMetadata
+                  - aps:GetSeries
+                  - aps:ListWorkspaces
+                  - aps:DescribeWorkspace
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/${AppName}*"
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/${AppName}*:log-stream:*"
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref GrafanaAdminPasswordSecret
+
+  # CloudWatch Log Groups
+  PrometheusLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${AppName}-prometheus"
+      RetentionInDays: 14
+
+  GrafanaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${AppName}-grafana"
+      RetentionInDays: 14
+
+  # Security Group for Prometheus and Grafana
+  MonitoringSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Prometheus and Grafana
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 10.0.0.0/8
+        - IpProtocol: tcp
+          FromPort: 9090
+          ToPort: 9090
+          CidrIp: 10.0.0.0/8
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-monitoring-sg"
+
+  # Target Groups
+  GrafanaTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${AppName}-grafana-tg"
+      Port: 3000
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref VpcId
+      HealthCheckPath: /api/health
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-grafana-tg"
+
+  PrometheusTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${AppName}-prometheus-tg"
+      Port: 9090
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref VpcId
+      HealthCheckPath: /prometheus/-/healthy
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-prometheus-tg"
+
+  # Listener Rules
+  GrafanaListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref GrafanaTargetGroup
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /grafana*
+      ListenerArn: !ImportValue 
+        Fn::Sub: "${AppName}-https-listener-arn"
+      Priority: 90
+
+  PrometheusListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref PrometheusTargetGroup
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /prometheus*
+      ListenerArn: !ImportValue 
+        Fn::Sub: "${AppName}-https-listener-arn"
+      Priority: 95
+
+  # Task Definitions
+  PrometheusTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${AppName}-prometheus"
+      Cpu: '1024'
+      Memory: '2048'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !ImportValue 
+        Fn::Sub: "${AppName}-ecs-task-execution-role-arn"
+      TaskRoleArn: !Ref PrometheusRole
+      ContainerDefinitions:
+        - Name: "config-init"
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${AppName}/python3.13.3"
+          Essential: false
+          Command:
+            - "/bin/sh"
+            - "-c"
+            - |
+              # Create prometheus.yml directly instead of downloading from S3
+              mkdir -p /config
+              cat > /config/prometheus.yml << EOF
+              global:
+                scrape_interval: 15s
+                evaluation_interval: 15s
+              
+              scrape_configs:
+                - job_name: 'prometheus'
+                  metrics_path: '/prometheus/metrics'
+                  static_configs:
+                    - targets: ['localhost:9090']
+              
+                # ECS Service Connect discovery - comment out services that don't have metrics endpoints
+                - job_name: 'service-connect'
+                  static_configs:
+                    - targets: 
+                      # Include only the services that have /metrics endpoints
+                      - 'prometheus:9090'
+                      # The following services are commented out until they're confirmed to have metrics endpoints
+                      # - 'backend:8000'
+                      # - 'login:8000'
+                      # - 'main:8000'
+                      # - 'nginx:80'
+                      # - 'search:8000'
+                      # - 'admin:8000'
+                      # - 'recipes:8000'
+                      # - 'reports:8000'
+                      # - 'secrets:8000'
+                      # - 'shared-templates:8000'
+                  metrics_path: /prometheus/metrics
+                  relabel_configs:
+                    - source_labels: [__address__]
+                      regex: '(.*):.*'
+                      target_label: service_name
+                      replacement: '\$1'
+              
+              remote_write:
+                - url: \${PrometheusWorkspaceEndpoint}remote_write
+                  queue_config:
+                    max_samples_per_send: 1000
+                    max_shards: 200
+                    capacity: 2500
+                  sigv4:
+                    region: \${AWS::Region}
+              EOF
+              
+              # Replace template variables
+              sed -i "s/\${AWS::Region}/${AWS_REGION}/g" /config/prometheus.yml
+              sed -i "s|\${PrometheusWorkspaceEndpoint}|https://aps-workspaces.${AWS_REGION}.amazonaws.com/workspaces/${PROMETHEUS_WORKSPACE_ID}/api/v1/|g" /config/prometheus.yml
+              
+              echo "Prometheus configuration created successfully"
+              cat /config/prometheus.yml
+          Environment:
+            - Name: "AWS_REGION"
+              Value: !Ref AWS::Region
+            - Name: "APP_NAME"
+              Value: !Ref AppName
+            - Name: "PROMETHEUS_WORKSPACE_ID"
+              Value: !GetAtt PrometheusWorkspace.WorkspaceId
+          MountPoints:
+            - SourceVolume: "config"
+              ContainerPath: "/config"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref PrometheusLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: config-init
+          
+        - Name: !Sub "${AppName}-prometheus-container"
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${AppName}/prometheus:latest"
+          Essential: true
+          DependsOn:
+            - ContainerName: "config-init"
+              Condition: SUCCESS
+          PortMappings:
+            - Name: prometheus-port
+              ContainerPort: 9090
+              HostPort: 9090
+              Protocol: tcp
+          MountPoints:
+            - SourceVolume: "config"
+              ContainerPath: "/etc/prometheus"
+              ReadOnly: true
+            - SourceVolume: "prometheus-data"
+              ContainerPath: "/prometheus"
+              ReadOnly: false
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref PrometheusLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+          Command:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus"
+            - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+            - "--web.console.templates=/usr/share/prometheus/consoles"
+            - "--web.route-prefix=/prometheus"
+            - "--web.external-url=https://chemtrack.767397980456.aws.glpoly.net/prometheus"
+            - "--enable-feature=exemplar-storage"
+      Volumes:
+        - Name: "config"
+        - Name: "prometheus-data"
+
+  GrafanaTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${AppName}-grafana"
+      Cpu: '1024'
+      Memory: '2048'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !ImportValue 
+        Fn::Sub: "${AppName}-ecs-task-execution-role-arn"
+      TaskRoleArn: !Ref GrafanaRole
+      ContainerDefinitions:
+        - Name: "grafana-init"
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${AppName}/python3.13.3"
+          Essential: false
+          User: "root" 
+          Command:
+            - "/bin/sh"
+            - "-c"
+            - |
+              id -u
+              whoami
+              apt-get update && apt-get install -y ca-certificates curl unzip wget
+              
+              # Create necessary directories
+              mkdir -p /var/lib/grafana
+              mkdir -p /var/lib/grafana/conf
+              mkdir -p /var/lib/grafana/plugins/grafana-piechart-panel
+              mkdir -p /var/lib/grafana/plugins/grafana-worldmap-panel
+              mkdir -p /var/lib/grafana/provisioning/datasources
+              
+              # Manually download and install the plugins
+              echo "Downloading piechart panel plugin..."
+              wget -q --no-check-certificate https://grafana.com/api/plugins/grafana-piechart-panel/versions/latest/download -O /tmp/piechart.zip
+              unzip -q /tmp/piechart.zip -d /var/lib/grafana/plugins/grafana-piechart-panel
+              rm /tmp/piechart.zip
+              
+              echo "Downloading worldmap panel plugin..."
+              wget -q --no-check-certificate https://grafana.com/api/plugins/grafana-worldmap-panel/versions/latest/download -O /tmp/worldmap.zip
+              unzip -q /tmp/worldmap.zip -d /var/lib/grafana/plugins/grafana-worldmap-panel
+              rm /tmp/worldmap.zip
+              
+              # Create Prometheus datasource configuration file
+              cat > /var/lib/grafana/provisioning/datasources/prometheus.yaml << EOF
+              apiVersion: 1
+              
+              datasources:
+                - name: Prometheus
+                  type: prometheus
+                  access: proxy
+                  url: http://prometheus:9090/prometheus
+                  isDefault: true
+                  version: 1
+                  editable: true
+                  jsonData:
+                    timeInterval: 5s
+                  secureJsonData:
+              EOF
+              
+              # Create custom grafana.ini with OAuth TLS skip verification
+              cat > /var/lib/grafana/conf/grafana.ini << EOF
+              [server]
+              root_url = https://chemtrack.767397980456.aws.glpoly.net/grafana
+              serve_from_sub_path = true
+              
+              [auth]
+              disable_login_form = false
+              
+              [auth.generic_oauth]
+              tls_skip_verify_insecure = true
+              
+              [plugins]
+              allow_loading_unsigned_plugins = grafana-piechart-panel,grafana-worldmap-panel
+              
+              [plugin.grafana-piechart-panel]
+              path = "/var/lib/grafana/plugins/grafana-piechart-panel"
+              
+              [plugin.grafana-worldmap-panel]
+              path = "/var/lib/grafana/plugins/grafana-worldmap-panel"
+              EOF
+              
+              # Set proper ownership and permissions
+              chown -R 472:472 /var/lib/grafana
+              chmod -R 755 /var/lib/grafana
+              ls -la /var/lib/grafana
+              ls -la /var/lib/grafana/conf
+              ls -la /var/lib/grafana/plugins
+              cat /var/lib/grafana/conf/grafana.ini
+              echo "Grafana storage, plugins, and configuration prepared with correct permissions"
+          MountPoints:
+            - SourceVolume: "grafana-storage"
+              ContainerPath: "/var/lib/grafana"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref GrafanaLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: init
+              
+        - Name: !Sub "${AppName}-grafana-container"
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${AppName}/grafana:latest"
+          Essential: true
+          DependsOn:
+            - ContainerName: "grafana-init"
+              Condition: SUCCESS
+          PortMappings:
+            - ContainerPort: 3000
+              HostPort: 3000
+              Protocol: tcp
+          MountPoints:
+            - SourceVolume: "grafana-storage"
+              ContainerPath: "/var/lib/grafana"
+              ReadOnly: false
+          Environment:
+            - Name: "GF_PATHS_CONFIG"
+              Value: "/var/lib/grafana/conf/grafana.ini"
+            - Name: "GF_SERVER_ROOT_URL"
+              Value: "https://chemtrack.767397980456.aws.glpoly.net/grafana"
+            - Name: "GF_SERVER_SERVE_FROM_SUB_PATH"
+              Value: "true"
+            - Name: "GF_PATHS_PROVISIONING"
+              Value: "/etc/grafana/provisioning"
+            - Name: "GF_AUTH_BASIC_ENABLED"
+              Value: "true"
+            - Name: "GF_USERS_ALLOW_SIGN_UP"
+              Value: "false"
+            - Name: "GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS"
+              Value: "grafana-piechart-panel,grafana-worldmap-panel"
+            - Name: "GF_INSECURE_SKIP_VERIFY"
+              Value: "true"
+          Secrets:
+            - Name: "GF_SECURITY_ADMIN_PASSWORD"
+              ValueFrom: !Ref GrafanaAdminPasswordSecret
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref GrafanaLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+      Volumes:
+        - Name: "grafana-storage"
+
+  # No EFS resources needed as we're using ephemeral storage
+
+  # ECS Services
+  PrometheusService:
+    Type: AWS::ECS::Service
+    DependsOn: PrometheusListenerRule
+    Properties:
+      ServiceName: !Sub "${AppName}-prometheus-service"
+      Cluster: !ImportValue 
+        Fn::Sub: "${AppName}-cluster-arn"
+      TaskDefinition: !Ref PrometheusTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: !Ref DesiredCount
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref MonitoringSecurityGroup
+          Subnets:
+            - !Ref PrivateSubnet1
+            - !Ref PrivateSubnet2
+      LoadBalancers:
+        - ContainerName: !Sub "${AppName}-prometheus-container"
+          ContainerPort: 9090
+          TargetGroupArn: !Ref PrometheusTargetGroup
+      HealthCheckGracePeriodSeconds: 60
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-prometheus-service"
+      ServiceConnectConfiguration:
+        Enabled: true
+        Namespace: !Sub ${AppName}.local
+        Services:
+          - PortName: prometheus-port
+            DiscoveryName: prometheus
+            ClientAliases:
+              - Port: 9090
+                DnsName: prometheus
+
+  GrafanaService:
+    Type: AWS::ECS::Service
+    DependsOn: GrafanaListenerRule
+    Properties:
+      ServiceName: !Sub "${AppName}-grafana-service"
+      Cluster: !ImportValue 
+        Fn::Sub: "${AppName}-cluster-arn"
+      TaskDefinition: !Ref GrafanaTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: !Ref DesiredCount
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref MonitoringSecurityGroup
+          Subnets:
+            - !Ref PrivateSubnet1
+            - !Ref PrivateSubnet2
+      LoadBalancers:
+        - ContainerName: !Sub "${AppName}-grafana-container"
+          ContainerPort: 3000
+          TargetGroupArn: !Ref GrafanaTargetGroup
+      HealthCheckGracePeriodSeconds: 60
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-grafana-service"
+      ServiceConnectConfiguration:
+        Enabled: true
+        Namespace: !Sub ${AppName}.local
+
+  # AMP Scraper configuration
+  AMPScraper:
+    Type: AWS::APS::RuleGroupsNamespace
+    Properties:
+      Name: !Sub "${AppName}-scraper"
+      Data: |
+        groups:
+          - name: ecs-service-discovery
+            rules:
+              - record: up
+                expr: up{job="ecs-service-discovery"}
+      Workspace: !GetAtt PrometheusWorkspace.Arn
+
+  # S3 Policy for accessing Prometheus configuration
+  S3AccessPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "${AppName}-s3-access-policy"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !Sub "arn:aws:s3:::chemtrack-project-bucket"
+              - !Sub "arn:aws:s3:::chemtrack-project-bucket/*"
+      Roles:
+        - !Ref PrometheusRole
+        
+  # Policy to allow ECS task execution role to access Grafana admin password secret
+  TaskExecutionRolePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Allows ECS Task Execution Role to access Grafana admin password secret
+      ManagedPolicyName: !Sub "${AppName}-grafana-secrets-access"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+            Resource:
+              - !Ref GrafanaAdminPasswordSecret
+      
+  # Attach policy to the task execution role
+  TaskExecutionRolePolicyAttachment:
+    Type: 'Custom::PolicyAttachment'
+    Properties:
+      ServiceToken: !GetAtt PolicyAttachmentFunction.Arn
+      RoleArn: !ImportValue 
+        Fn::Sub: "${AppName}-ecs-task-execution-role-arn"
+      PolicyArn: !Ref TaskExecutionRolePolicy
+  
+  # Lambda function to attach policy to role
+  PolicyAttachmentFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt PolicyAttachmentLambdaRole.Arn
+      Runtime: python3.9
+      Timeout: 30
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import time
+          
+          def handler(event, context):
+            try:
+              if event['RequestType'] in ['Create', 'Update']:
+                role_arn = event['ResourceProperties']['RoleArn']
+                policy_arn = event['ResourceProperties']['PolicyArn']
+                
+                # Extract role name from ARN
+                role_name = role_arn.split('/')[-1]
+                
+                iam = boto3.client('iam')
+                iam.attach_role_policy(
+                  RoleName=role_name,
+                  PolicyArn=policy_arn
+                )
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                  'Message': f'Attached policy {policy_arn} to role {role_name}'
+                })
+              elif event['RequestType'] == 'Delete':
+                role_arn = event['ResourceProperties']['RoleArn']
+                policy_arn = event['ResourceProperties']['PolicyArn']
+                
+                # Extract role name from ARN
+                role_name = role_arn.split('/')[-1]
+                
+                iam = boto3.client('iam')
+                try:
+                  iam.detach_role_policy(
+                    RoleName=role_name,
+                    PolicyArn=policy_arn
+                  )
+                except Exception as e:
+                  print(f"Error detaching policy: {str(e)}")
+                  # Continue with deletion even if detach fails
+                
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                  'Message': f'Detached policy {policy_arn} from role {role_name}'
+                })
+            except Exception as e:
+              print(str(e))
+              cfnresponse.send(event, context, cfnresponse.FAILED, {
+                'Message': str(e)
+              })
+              
+  # IAM role for the policy attachment Lambda function
+  PolicyAttachmentLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: !Sub "${AppName}-attach-policy-permission"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                Resource: "*"
+
+Outputs:
+  PrometheusWorkspaceArn:
+    Description: ARN of the Prometheus workspace
+    Value: !GetAtt PrometheusWorkspace.Arn
+    Export:
+      Name: !Sub "${AppName}-prometheus-workspace-arn"
+
+  GrafanaServiceArn:
+    Description: ARN of the Grafana service
+    Value: !Ref GrafanaService
+    Export:
+      Name: !Sub "${AppName}-grafana-service-arn"
+
+  PrometheusServiceArn:
+    Description: ARN of the Prometheus service
+    Value: !Ref PrometheusService
+    Export:
+      Name: !Sub "${AppName}-prometheus-service-arn"
+
+  GrafanaURL:
+    Description: URL for Grafana dashboard
+    Value: !Sub "https://chemtrack.767397980456.aws.glpoly.net/grafana"
+    Export:
+      Name: !Sub "${AppName}-grafana-url"
+
+  PrometheusURL:
+    Description: URL for Prometheus web interface
+    Value: !Sub "https://chemtrack.767397980456.aws.glpoly.net/prometheus"
+    Export:
+      Name: !Sub "${AppName}-prometheus-url"

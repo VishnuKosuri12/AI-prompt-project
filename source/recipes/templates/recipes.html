@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChemTrack - Recipe Management</title>
+    <link rel="stylesheet" href="{{static_url}}/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header - pulled from shared templates -->
+        {{ header_html|safe }}
+
+        <!-- Main Content -->
+        <div class="main-container">
+            <!-- Navigation Sidebar - pulled from shared templates -->
+            {{ navigation_html|safe }}
+
+            <!-- Content Area -->
+            <main class="content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Recipe Management</h2>
+                    </div>
+                    <p>Welcome to the Recipe Management Module where you can manage chemical recipes and formulations.</p>
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

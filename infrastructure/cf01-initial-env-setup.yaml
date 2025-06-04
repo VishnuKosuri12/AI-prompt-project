@@ -1,0 +1,388 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Initial environment setup for ChemTrack application'
+
+Parameters:
+  AppName:
+    Type: String
+    Default: "chemtrack"
+    Description: "Name of the application"
+  CertificateGlpolyCatalogVersion:
+    Type: String
+    Description: "Version of the SSL Certificate catalog product"
+
+Resources:
+  # AWS Systems Manager Parameter Store
+  ChemtrackApiKeyParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: chemtrack-api-key
+      Description: API Key for ChemTrack Backend Services
+      Type: String
+      Tier: Standard
+      Value: !Join 
+        - ""
+        - - !Select [0, !Split ["-", !Select [2, !Split ["/", !Ref "AWS::StackId"]]]]
+          - !Select [0, !Split ["-", !Select [2, !Split ["/", !Ref "AWS::StackId"]]]]
+          - !Select [0, !Split ["-", !Select [2, !Split ["/", !Ref "AWS::StackId"]]]]
+          - !Select [0, !Split ["-", !Select [2, !Split ["/", !Ref "AWS::StackId"]]]]
+      Tags:
+        Name: !Sub ${AppName}-api-key
+
+  # AWS Secrets Manager Secrets
+  ChemtrackDbAdminUserSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: chemtrack-db-admin-user
+      Description: Database admin user credentials
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "postgre"}'
+        GenerateStringKey: password
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+
+  ChemtrackDbAppUserSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: chemtrack-db-app-user
+      Description: Database application user credentials
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "chemuser"}'
+        GenerateStringKey: password
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+
+  ChemtrackEnvVarsSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: env-vars
+      Description: Environment variables for ChemTrack application
+      SecretString: '{"app_url": "chemtrack.767397980456.aws.glpoly.net", "db_url": "ctrds.767397980456.aws.glpoly.net"}'
+
+  # ECR Repositories
+  ChemtrackMainRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: chemtrack/main
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "remove old history",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  ChemtrackSearchRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: chemtrack/search
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "remove old history",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  ChemtrackBackendRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: chemtrack/backend
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "remove old history",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  ChemtrackLoginRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: chemtrack/login
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "remove old history",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  ChemtrackNginxRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: chemtrack/nginx
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "remove old history",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  ChemtrackSharedTemplatesRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: chemtrack/shared-templates
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "remove old history",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  ChemtrackRecipesRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: chemtrack/recipes
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "remove old history",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  ChemtrackSecretsRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: chemtrack/secrets
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "remove old history",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+
+  # S3 Bucket for Project
+  ChemtrackProjectBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: chemtrack-project-bucket
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Suspended
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  ChemtrackProjectBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ChemtrackProjectBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${ChemtrackProjectBucket}'
+              - !Sub 'arn:aws:s3:::${ChemtrackProjectBucket}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+
+  # S3 Bucket for Access Logs
+  ChemtrackAccessLogsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: chemtrack-access-logs
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Suspended
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  ChemtrackAccessLogsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ChemtrackAccessLogsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowLogDelivery
+            Effect: Allow
+            Principal:
+              AWS: 'arn:aws:iam::127311923021:root'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${ChemtrackAccessLogsBucket}/*'
+            
+  # SSL Certificate
+  ALBCertificate:
+    Type: "AWS::ServiceCatalog::CloudFormationProvisionedProduct"
+    Properties:
+      ProductName: "SSL Certificate aws.glpoly.net"
+      ProvisionedProductName:
+        !Sub "certificate-${AppName}"
+      ProvisioningArtifactName: !Ref CertificateGlpolyCatalogVersion
+      ProvisioningParameters:
+        - Key: "Domain"
+          Value: !Ref AppName
+
+Outputs:
+  ChemtrackApiKey:
+    Description: The name of the API key parameter
+    Value: !Ref ChemtrackApiKeyParameter
+    Export:
+      Name: !Sub ${AppName}-api-key-param
+      
+  ChemtrackAccessLogsBucketName:
+    Description: Name of the S3 bucket for access logs
+    Value: !Ref ChemtrackAccessLogsBucket
+    Export:
+      Name: ChemtrackAccessLogsBucketName
+
+  ChemtrackAccessLogsBucketArn:
+    Description: ARN of the S3 bucket for access logs
+    Value: !GetAtt ChemtrackAccessLogsBucket.Arn
+    Export:
+      Name: ChemtrackAccessLogsBucketArn
+
+  ChemtrackProjectBucketName:
+    Description: Name of the S3 bucket for the project
+    Value: !Ref ChemtrackProjectBucket
+    Export:
+      Name: ChemtrackProjectBucketName
+
+  ChemtrackProjectBucketArn:
+    Description: ARN of the S3 bucket for the project
+    Value: !GetAtt ChemtrackProjectBucket.Arn
+    Export:
+      Name: ChemtrackProjectBucketArn

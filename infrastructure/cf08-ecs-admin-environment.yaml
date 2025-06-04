@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for ChemTrack Administration Container'
+
+Parameters:
+  AppName:
+    Type: String
+    Description: Name of the application
+    Default: chemtrack
+  AppURL:
+    Type: String
+    Description: root application url
+    Default: "chemtrack.767397980456.aws.glpoly.net"
+  VpcId:
+    Type: String
+    Description: VPC ID where the ECS cluster will be deployed
+    Default: vpc-019e35a7f8ca205e5
+  PrivateSubnet1:
+    Type: String
+    Description: First private subnet ID for the ECS cluster
+    Default: subnet-08de8ae010ebfa1f3
+  PrivateSubnet2:
+    Type: String
+    Description: Second private subnet ID for the ECS cluster
+    Default: subnet-0205ddf1053073b5c
+
+Resources:
+  # CloudWatch Log Group
+  AdminLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /ecs/${AppName}-admin
+      RetentionInDays: 7
+
+  # Target Group
+  AdminTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${AppName}-admin-tg
+      Port: 8000
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref VpcId
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-admin-tg
+
+  # ALB Rule
+  AdminRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !ImportValue chemtrack-https-listener-arn
+      Priority: 30
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /admin*
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref AdminTargetGroup
+
+  # ECS Task Definition
+  AdminTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${AppName}-admin
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !ImportValue chemtrack-ecs-task-execution-role-arn
+      TaskRoleArn: !ImportValue chemtrack-ecs-task-role-arn
+      ContainerDefinitions:
+        - Name: !Sub ${AppName}-admin-container
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/chemtrack/admin:latest
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8000
+              HostPort: 8000
+              Protocol: tcp
+          Environment:
+            - Name: BASE_URL
+              Value: !Ref AppURL
+            - Name: SECRET_KEY
+              Value: '64df77320c1b5b56396028e0dfc01deb'
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref AdminLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-admin-task
+
+  # ECS Service
+  AdminService:
+    Type: AWS::ECS::Service
+    DependsOn: AdminRule
+    Properties:
+      ServiceName: !Sub ${AppName}-admin-service
+      Cluster: !ImportValue chemtrack-cluster-arn
+      TaskDefinition: !Ref AdminTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !ImportValue chemtrack-ecs-security-group-id
+          Subnets:
+            - !Ref PrivateSubnet1
+            - !Ref PrivateSubnet2
+      LoadBalancers:
+        - ContainerName: !Sub ${AppName}-admin-container
+          ContainerPort: 8000
+          TargetGroupArn: !Ref AdminTargetGroup
+      HealthCheckGracePeriodSeconds: 60
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-admin-service
+      ServiceConnectConfiguration:
+        Enabled: true
+        Namespace: !Sub ${AppName}.local
+
+Outputs:
+  AdminServiceArn:
+    Description: The ARN of the Admin ECS service
+    Value: !Ref AdminService
+    Export:
+      Name: !Sub ${AppName}-admin-service-arn
+
+  AdminTaskDefinitionArn:
+    Description: The ARN of the Admin Task Definition
+    Value: !Ref AdminTaskDefinition
+    Export:
+      Name: !Sub ${AppName}-admin-task-definition-arn
+
+  AdminTargetGroupArn:
+    Description: The ARN of the Admin Target Group
+    Value: !Ref AdminTargetGroup
+    Export:
+      Name: !Sub ${AppName}-admin-target-group-arn

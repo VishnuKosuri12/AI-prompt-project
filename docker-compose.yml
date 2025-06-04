@@ -1,0 +1,205 @@
+services:
+  backend:
+    build:
+      context: ./source/backend
+    container_name: ct-backend
+    ports:
+      - "8000:8000"
+    environment:
+      LOCAL_DEV: "true"
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - chemtrack-network
+
+  login:
+    build:
+      context: ./source/login
+    container_name: ct-login
+    ports:
+      - "8001:8000"
+    environment:
+      - BASE_URL=
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - chemtrack-network
+
+  main:
+    build:
+      context: ./source/main
+    container_name: ct-main
+    ports:
+      - "8003:8000"
+    environment:
+      - BASE_URL=
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - chemtrack-network
+
+  nginx:
+    build:
+      context: ./source/nginx
+    container_name: ct-nginx
+    ports:
+      - "8002:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - chemtrack-network
+
+  search:
+    build:
+      context: ./source/search
+    container_name: ct-search
+    ports:
+      - "8004:8000"
+    environment:
+      - BASE_URL=
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - chemtrack-network
+
+  shared-templates:
+    build:
+      context: ./source/shared-templates
+    container_name: ct-shared-templates
+    ports:
+      - "8005:8000"
+    environment:
+      - BASE_URL=
+      - SECRETS_SERVICE_URL=http://ct-secrets:8099
+      - LOCAL_DEV=true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - chemtrack-network
+
+  admin:
+    build:
+      context: ./source/admin
+    container_name: ct-admin
+    ports:
+      - "8006:8000"
+    environment:
+      - BASE_URL=
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - chemtrack-network
+      
+  recipes:
+    build:
+      context: ./source/recipes
+    container_name: ct-recipes
+    ports:
+      - "8007:8000"
+    environment:
+      - BASE_URL=
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - chemtrack-network
+      
+  reports:
+    build:
+      context: ./source/reports
+    container_name: ct-reports
+    ports:
+      - "8008:8000"
+    environment:
+      - BASE_URL=
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - chemtrack-network
+      
+  secrets:
+    build:
+      context: ./source/secrets
+    container_name: ct-secrets
+    ports:
+      - "8009:8099"
+    environment:
+      - LOCAL_DEV=true
+      - API_KEY_PARAM_NAME=chemtrack-api-key
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8099/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - chemtrack-network
+
+networks:
+  chemtrack-network:
+    name: chemtrack

@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChemTrack - User Management</title>
+    <link rel="stylesheet" href="{{static_url}}/styles.css">
+    <style>
+        .user-management-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .user-list-section {
+            flex: 1;
+            min-width: 400px;
+        }
+        .user-form-section {
+            flex: 1;
+            min-width: 400px;
+        }
+        .user-list {
+            height: 350px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .user-grid {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .user-grid th {
+            background-color: #f2f2f2;
+            text-align: left;
+            padding: 10px;
+            position: sticky;
+            top: 0;
+            border-bottom: 2px solid #ddd;
+        }
+        .user-grid tr {
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        .user-grid tr:hover {
+            background-color: #f9f9f9;
+        }
+        .user-grid tr.selected {
+            background-color: #e0f7fa;
+        }
+        .user-grid td {
+            padding: 10px;
+        }
+        .user-form {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .form-group {
+            flex: 1;
+            min-width: 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .form-group.error input, .form-group.error select {
+            border-color: #f44336;
+        }
+        .error-message {
+            color: #f44336;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .buttons-row {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .create-btn {
+            background-color: #4caf50;
+            color: white;
+        }
+        .save-btn {
+            background-color: #2196f3;
+            color: white;
+        }
+        .cancel-btn {
+            background-color: #f44336;
+            color: white;
+        }
+        .disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        h2 {
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header - pulled from shared templates -->
+        {{ header_html|safe }}
+
+        <!-- Main Content -->
+        <div class="main-container">
+            <!-- Navigation Sidebar - pulled from shared templates -->
+            {{ navigation_html|safe }}
+
+            <!-- Content Area -->
+            <main class="content">
+                <div class="container">
+                    <h1 class="page-title">User Management</h1>
+                    
+                    {% if error %}
+                    <div class="error-message">{{ error }}</div>
+                    {% endif %}
+                    
+                    <div class="user-management-container">
+                        <!-- User List Section -->
+                        <div class="user-list-section">
+                            <h2>User List</h2>
+                            <div class="user-list">
+                                <table class="user-grid" id="userGrid">
+                                    <thead>
+                                        <tr>
+                                            <th>Username</th>
+                                            <th>Email</th>
+                                            <th>Role</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="userList">
+                                        {% for user in users %}
+                                        <tr class="user-list-item" 
+                                            data-username="{{ user.username }}" 
+                                            data-email="{{ user.email }}" 
+                                            data-role="{{ user.role }}"
+                                            {% if user.preferences %}
+                                            data-building="{{ user.preferences.building|default('') }}"
+                                            data-lab-room="{{ user.preferences.lab_room|default('') }}"
+                                            {% endif %}
+                                            >
+                                            <td><strong>{{ user.username }}</strong></td>
+                                            <td>{{ user.email }}</td>
+                                            <td>{{ user.role }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- User Form Section -->
+                        <div class="user-form-section">
+                            <h2>User Details</h2>
+                            <div class="user-form">
+                                <form id="userForm">
+                                    <div class="form-row">
+                                        <div class="form-group" id="usernameGroup">
+                                            <label for="username">Username:</label>
+                                            <input type="text" id="username" name="username" required>
+                                            <div class="error-message" id="usernameError"></div>
+                                        </div>
+                                        
+                                        <div class="form-group" id="emailGroup">
+                                            <label for="email">Email Address:</label>
+                                            <input type="email" id="email" name="email" required>
+                                            <div class="error-message" id="emailError"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-row">
+                                        <div class="form-group" id="roleGroup">
+                                            <label for="role">Role:</label>
+                                            <select id="role" name="role" required>
+                                                <option value="">Select a role</option>
+                                                {% for role_name in roles %}
+                                                <option value="{{ role_name }}">{{ role_name|title }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <div class="error-message" id="roleError"></div>
+                                        </div>
+                                        
+                                        <div class="form-group" id="buildingGroup">
+                                            <label for="building">Building:</label>
+                                            <select id="building" name="building" required>
+                                                <option value="">Select a building</option>
+                                                {% for building in buildings %}
+                                                <option value="{{ building }}">{{ building }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <div class="error-message" id="buildingError"></div>
+                                        </div>
+                                        
+                                        <div class="form-group" id="labRoomGroup">
+                                            <label for="labRoom">Lab Room:</label>
+                                            <select id="labRoom" name="labRoom" required>
+                                                <option value="">Select a lab room</option>
+                                            </select>
+                                            <div class="error-message" id="labRoomError"></div>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                            
+                            <!-- Buttons -->
+                            <div class="buttons-row">
+                                <button id="createUserBtn" class="button create-btn">Create User</button>
+                                <button id="saveChangesBtn" class="button save-btn disabled">Save Changes</button>
+                                <button id="cancelChangesBtn" class="button cancel-btn disabled">Cancel Changes</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const userList = document.getElementById('userList');
+                        const userForm = document.getElementById('userForm');
+                        const createUserBtn = document.getElementById('createUserBtn');
+                        const saveChangesBtn = document.getElementById('saveChangesBtn');
+                        const cancelChangesBtn = document.getElementById('cancelChangesBtn');
+                        
+                        // Form fields
+                        const usernameInput = document.getElementById('username');
+                        const emailInput = document.getElementById('email');
+                        const roleSelect = document.getElementById('role');
+                        const buildingSelect = document.getElementById('building');
+                        const labRoomSelect = document.getElementById('labRoom');
+                        
+                        // Error message elements
+                        const usernameError = document.getElementById('usernameError');
+                        const emailError = document.getElementById('emailError');
+                        const roleError = document.getElementById('roleError');
+                        const buildingError = document.getElementById('buildingError');
+                        const labRoomError = document.getElementById('labRoomError');
+                        
+                        let isEditMode = false;
+                        let isCreateMode = false;
+                        let selectedUser = null;
+                        
+                        // Clear form and error messages
+                        function clearForm() {
+                            userForm.reset();
+                            clearErrors();
+                        }
+                        
+                        // Clear error messages
+                        function clearErrors() {
+                            usernameError.textContent = '';
+                            emailError.textContent = '';
+                            roleError.textContent = '';
+                            buildingError.textContent = '';
+                            labRoomError.textContent = '';
+                            
+                            document.getElementById('usernameGroup').classList.remove('error');
+                            document.getElementById('emailGroup').classList.remove('error');
+                            document.getElementById('roleGroup').classList.remove('error');
+                            document.getElementById('buildingGroup').classList.remove('error');
+                            document.getElementById('labRoomGroup').classList.remove('error');
+                        }
+                        
+                        // Enable edit mode
+                        function enableEditMode() {
+                            isEditMode = true;
+                            isCreateMode = false;
+                            
+                            saveChangesBtn.classList.remove('disabled');
+                            cancelChangesBtn.classList.remove('disabled');
+                            
+                            // Disable selecting users from the list
+                            const userItems = userList.querySelectorAll('.user-list-item');
+                            userItems.forEach(item => {
+                                item.style.pointerEvents = 'none';
+                                item.style.opacity = '0.6';
+                            });
+                        }
+                        
+                        // Disable edit mode
+                        function disableEditMode() {
+                            isEditMode = false;
+                            isCreateMode = false;
+                            
+                            saveChangesBtn.classList.add('disabled');
+                            cancelChangesBtn.classList.add('disabled');
+                            
+                            // Enable selecting users from the list
+                            const userItems = userList.querySelectorAll('.user-list-item');
+                            userItems.forEach(item => {
+                                item.style.pointerEvents = 'auto';
+                                item.style.opacity = '1';
+                            });
+                        }
+                        
+                        // Enable create mode
+                        function enableCreateMode() {
+                            isCreateMode = true;
+                            isEditMode = false;
+                            
+                            clearForm();
+                            selectUser(null);
+                            
+                            saveChangesBtn.classList.remove('disabled');
+                            cancelChangesBtn.classList.remove('disabled');
+                            
+                            // Disable selecting users from the list
+                            const userItems = userList.querySelectorAll('.user-list-item');
+                            userItems.forEach(item => {
+                                item.style.pointerEvents = 'none';
+                                item.style.opacity = '0.6';
+                            });
+                        }
+                        
+                        // Select a user
+                        function selectUser(userItem) {
+                            console.group('Selecting User');
+                            // Remove selection from all users
+                            const userItems = userList.querySelectorAll('.user-list-item');
+                            userItems.forEach(item => {
+                                item.classList.remove('selected');
+                            });
+                            
+                            if (userItem) {
+                                // Add selection to the clicked user
+                                userItem.classList.add('selected');
+                                
+                                // Fill form with user data
+                                const username = userItem.getAttribute('data-username');
+                                const email = userItem.getAttribute('data-email');
+                                const role = userItem.getAttribute('data-role');
+                                const building = userItem.getAttribute('data-building');
+                                const labRoom = userItem.getAttribute('data-lab-room');
+                                
+                                usernameInput.value = username;
+                                emailInput.value = email;
+                                roleSelect.value = role;
+                                
+                                console.log('User data from attributes:', {
+                                    username, 
+                                    email,
+                                    role,
+                                    building,
+                                    labRoom
+                                });
+                                
+                                // Set building selection directly from the data attribute
+                                if (building) {
+                                    console.log(`Setting building value to: ${building}`);
+                                    buildingSelect.value = building;
+                                    
+                                    // Force the lab room value to update after a short delay to ensure the building is selected
+                                    setTimeout(() => {
+                                        // Load lab rooms for selected building with the selected lab room
+                                        console.log(`Loading lab rooms for building: ${building}, will select lab room: ${labRoom}`);
+                                        
+                                        // Clear current options
+                                        labRoomSelect.innerHTML = '<option value="">Select a lab room</option>';
+                                        
+                                        fetch(`/admin/lab_rooms/${encodeURIComponent(building)}`)
+                                            .then(response => response.json())
+                                            .then(data => {
+                                                if (data.success && data.lab_rooms && data.lab_rooms.length > 0) {
+                                                    console.log('Lab room data:', data);
+                                                    
+                                                    // Add lab room options
+                                                    data.lab_rooms.forEach(room => {
+                                                        const option = document.createElement('option');
+                                                        option.value = String(room);
+                                                        option.textContent = String(room);
+                                                        labRoomSelect.appendChild(option);
+                                                    });
+                                                    
+                                                    if (labRoom) {
+                                                        console.log(`Trying to set lab room selection to: ${labRoom}`);
+                                                        labRoomSelect.value = String(labRoom);
+                                                        console.log('Lab room select value after direct set:', labRoomSelect.value);
+                                                        
+                                                        // If direct set didn't work, try index-based selection
+                                                        if (labRoomSelect.value !== String(labRoom)) {
+                                                            const labRoomStr = String(labRoom);
+                                                            for (let i = 0; i < labRoomSelect.options.length; i++) {
+                                                                if (String(labRoomSelect.options[i].value) === labRoomStr) {
+                                                                    console.log(`Found matching option at index ${i}`);
+                                                                    labRoomSelect.selectedIndex = i;
+                                                                    break;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            })
+                                            .catch(error => {
+                                                console.error('Error fetching lab rooms:', error);
+                                            });
+                                    }, 100);
+                                } else {
+                                    console.log('No building preference found for user');
+                                    buildingSelect.value = '';
+                                    labRoomSelect.innerHTML = '<option value="">Select a lab room</option>';
+                                }
+                                
+                                selectedUser = username;
+                            } else {
+                                clearForm();
+                                selectedUser = null;
+                            }
+                            console.groupEnd();
+                        }
+                        
+                        // Load lab rooms for a building
+                        function loadLabRooms(building, selectedLabRoom = null) {
+                            console.log(`In loadLabRooms. Building: ${building}, selectedLabRoom: ${selectedLabRoom}`);
+                            
+                            // Clear current options
+                            labRoomSelect.innerHTML = '<option value="">Select a lab room</option>';
+                            
+                            // API URL must be properly encoded - use the proxy endpoint
+                            const url = `/admin/lab_rooms/${encodeURIComponent(building)}`;
+                            console.log(`Fetching lab rooms from: ${url}`);
+                            
+                            fetch(url)
+                                .then(response => {
+                                    console.log(`Lab rooms API response status: ${response.status}`);
+                                    return response.json();
+                                })
+                                .then(data => {
+                                    console.log('Lab rooms API data:', data);
+                                    
+                                    if (data.success && data.lab_rooms && data.lab_rooms.length > 0) {
+                                        console.log(`Received ${data.lab_rooms.length} lab rooms`);
+                                        
+                                        // Add lab room options
+                                        data.lab_rooms.forEach(labRoom => {
+                                            const option = document.createElement('option');
+                                            option.value = labRoom;
+                                            option.textContent = labRoom;
+                                            labRoomSelect.appendChild(option);
+                                        });
+                                        
+                                        console.log(`Added ${data.lab_rooms.length} lab room options to select`);
+                                        
+                                        // Set selected lab room if provided
+                                        if (selectedLabRoom && selectedLabRoom !== '') {
+                                            console.log(`Attempting to select lab room: ${selectedLabRoom}`);
+                                            
+                                            // Try a direct value set first
+                                            labRoomSelect.value = selectedLabRoom;
+                                            
+                                            // Check if direct set worked
+                                            if (labRoomSelect.value !== selectedLabRoom) {
+                                                console.log(`Direct value set failed, trying string matching`);
+                                                
+                                                // Convert both to strings for comparison
+                                                const selectedLabRoomStr = String(selectedLabRoom);
+                                                
+                                                // Try to find the option by matching text content
+                                                for (let i = 0; i < labRoomSelect.options.length; i++) {
+                                                    const optionValue = String(labRoomSelect.options[i].value);
+                                                    console.log(`Comparing option ${i}: ${optionValue} with ${selectedLabRoomStr}`);
+                                                    
+                                                    if (optionValue === selectedLabRoomStr) {
+                                                        labRoomSelect.selectedIndex = i;
+                                                        console.log(`Found matching lab room at index ${i}, set selectedIndex`);
+                                                        break;
+                                                    }
+                                                }
+                                            } else {
+                                                console.log(`Successfully set lab room value to ${selectedLabRoom}`);
+                                            }
+                                            
+                                            // Final check to see if we succeeded
+                                            if (labRoomSelect.value != selectedLabRoom) {
+                                                console.warn(`Failed to set lab room selection. Wanted: ${selectedLabRoom}, Got: ${labRoomSelect.value}`);
+                                            }
+                                        } else {
+                                            console.log('No lab room provided to select');
+                                        }
+                                    } else {
+                                        console.warn(`No lab rooms found for building: ${building}`);
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error(`Error fetching lab rooms: ${error.message}`);
+                                });
+                        }
+                        
+                        // Validate form
+                        function validateForm() {
+                            let isValid = true;
+                            clearErrors();
+                            
+                            // Validate username
+                            if (!usernameInput.value.trim()) {
+                                usernameError.textContent = 'Username is required';
+                                document.getElementById('usernameGroup').classList.add('error');
+                                isValid = false;
+                            }
+                            
+                            // Validate email
+                            if (!emailInput.value.trim()) {
+                                emailError.textContent = 'Email is required';
+                                document.getElementById('emailGroup').classList.add('error');
+                                isValid = false;
+                            } else if (!emailInput.validity.valid) {
+                                emailError.textContent = 'Please enter a valid email address';
+                                document.getElementById('emailGroup').classList.add('error');
+                                isValid = false;
+                            }
+                            
+                            // Validate role
+                            if (!roleSelect.value) {
+                                roleError.textContent = 'Role is required';
+                                document.getElementById('roleGroup').classList.add('error');
+                                isValid = false;
+                            }
+                            
+                            // Validate building
+                            if (!buildingSelect.value) {
+                                buildingError.textContent = 'Building is required';
+                                document.getElementById('buildingGroup').classList.add('error');
+                                isValid = false;
+                            }
+                            
+                            // Validate lab room
+                            if (!labRoomSelect.value) {
+                                labRoomError.textContent = 'Lab room is required';
+                                document.getElementById('labRoomGroup').classList.add('error');
+                                isValid = false;
+                            }
+                            
+                            return isValid;
+                        }
+                        
+                        // Event listener for user list items
+                        userList.addEventListener('click', function(event) {
+                            const userItem = event.target.closest('.user-list-item');
+                            if (userItem && !isEditMode && !isCreateMode) {
+                                selectUser(userItem);
+                            }
+                        });
+                        
+                        // Event listener for create user button
+                        createUserBtn.addEventListener('click', function() {
+                            enableCreateMode();
+                        });
+                        
+                        // Event listener for save changes button
+                        saveChangesBtn.addEventListener('click', function() {
+                            if (saveChangesBtn.classList.contains('disabled')) {
+                                return;
+                            }
+                            
+                            if (validateForm()) {
+                                if (isCreateMode) {
+                                    // Create new user
+                                    const userData = {
+                                        username: usernameInput.value,
+                                        email: emailInput.value,
+                                        password: 'fred', // Default password as specified in requirements
+                                        role: roleSelect.value
+                                    };
+                                    
+                                    fetch(`/admin/create_user`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify(userData)
+                                    })
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            // Set user preferences for building and lab room
+                                            const buildingPref = {
+                                                username: userData.username,
+                                                key: 'building',
+                                                value: buildingSelect.value
+                                            };
+                                            
+                                            // Save both preferences sequentially to ensure both are saved
+                                            fetch(`/admin/update_user_preference`, {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json'
+                                                },
+                                                body: JSON.stringify(buildingPref)
+                                            })
+                                            .then(() => {
+                                                console.log("Building preference saved, now saving lab room...");
+                                                const labRoomPref = {
+                                                    username: userData.username,
+                                                    key: 'lab_room',
+                                                    value: labRoomSelect.value.toString()
+                                                };
+                                                console.log("Lab room preference value:", labRoomPref.value);
+                                                
+                                                return fetch(`/admin/update_user_preference`, {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'Content-Type': 'application/json'
+                                                    },
+                                                    body: JSON.stringify(labRoomPref)
+                                                });
+                                            })
+                                            .then(() => {
+                                                console.log("All preferences saved, reloading page");
+                                                // Reload the page to show the new user
+                                                window.location.reload();
+                                            });
+                                        } else {
+                                            alert('Error creating user: ' + data.message);
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('Error creating user:', error);
+                                        alert('Error creating user. Please try again.');
+                                    });
+                                } else if (isEditMode && selectedUser) {
+                                    // Update existing user
+                                    const userData = {
+                                        username: selectedUser, // Use the original username for identification
+                                        email: emailInput.value,
+                                        password: '', // Don't change password
+                                        role: roleSelect.value
+                                    };
+                                    
+                                    fetch(`/admin/update_user`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify(userData)
+                                    })
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            // Set user preferences for building and lab room
+                                            const buildingPref = {
+                                                username: selectedUser,
+                                                key: 'building',
+                                                value: buildingSelect.value
+                                            };
+                                            
+                                            // Save both preferences sequentially to ensure both are saved
+                                            fetch(`/admin/update_user_preference`, {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json'
+                                                },
+                                                body: JSON.stringify(buildingPref)
+                                            })
+                                            .then(() => {
+                                                console.log("Building preference saved, now saving lab room...");
+                                                const labRoomPref = {
+                                                    username: selectedUser,
+                                                    key: 'lab_room',
+                                                    value: labRoomSelect.value.toString()
+                                                };
+                                                console.log("Lab room preference value:", labRoomPref.value);
+                                                
+                                                return fetch(`/admin/update_user_preference`, {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'Content-Type': 'application/json'
+                                                    },
+                                                    body: JSON.stringify(labRoomPref)
+                                                });
+                                            })
+                                            .then(() => {
+                                                console.log("All preferences saved, reloading page");
+                                                // Reload the page to show updated data
+                                                window.location.reload();
+                                            });
+                                        } else {
+                                            alert('Error updating user: ' + data.message);
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('Error updating user:', error);
+                                        alert('Error updating user. Please try again.');
+                                    });
+                                }
+                                
+                                disableEditMode();
+                            }
+                        });
+                        
+                        // Event listener for cancel changes button
+                        cancelChangesBtn.addEventListener('click', function() {
+                            if (cancelChangesBtn.classList.contains('disabled')) {
+                                return;
+                            }
+                            
+                            disableEditMode();
+                            
+                            if (selectedUser) {
+                                // Reselect the current user to refresh form data
+                                const selectedItem = userList.querySelector(`.user-list-item[data-username="${selectedUser}"]`);
+                                selectUser(selectedItem);
+                            } else {
+                                clearForm();
+                            }
+                        });
+                        
+                        // Watch for form field changes to enable edit mode
+                        const formFields = [usernameInput, emailInput, roleSelect, buildingSelect, labRoomSelect];
+                        formFields.forEach(field => {
+                            field.addEventListener('change', function() {
+                                if (selectedUser && !isEditMode && !isCreateMode) {
+                                    enableEditMode();
+                                }
+                            });
+                        });
+                        
+                        // Event listener for building select
+                        buildingSelect.addEventListener('change', function() {
+                            const building = this.value;
+                            if (building) {
+                                loadLabRooms(building);
+                            } else {
+                                labRoomSelect.innerHTML = '<option value="">Select a lab room</option>';
+                            }
+                        });
+                        
+                        // Initialize with form disabled
+                        disableEditMode();
+                        clearForm();
+                    });
+                </script>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

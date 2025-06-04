@@ -1,0 +1,99 @@
+<!-- Chemical Details Modal -->
+<div id="modalBackdrop" class="modal-backdrop">
+    <div id="chemicalDetailsModal" class="modal">
+        
+        <!-- Inventory Update Dialog -->
+        <div id="inventoryDialog" class="inventory-dialog">
+            <div class="inventory-dialog-header">
+                <h4 id="inventoryDialogTitle" class="inventory-dialog-title">Update Inventory</h4>
+            </div>
+            <div class="inventory-dialog-content">
+                <div class="form-group">
+                    <label for="quantityInput" class="form-label">Quantity (<span id="inventoryUom"></span>)</label>
+                    <input type="number" id="quantityInput" class="form-control" min="0.01" step="0.01" placeholder="Enter quantity">
+                </div>
+                <div id="inventoryMessage" class="inventory-error" style="display:none;"></div>
+            </div>
+            <div class="inventory-dialog-actions">
+                <button id="cancelInventoryBtn" class="btn">Cancel</button>
+                <button id="confirmInventoryBtn" class="btn btn-primary">Add</button>
+            </div>
+        </div>
+        <div class="modal-header">
+            <h3 id="modalTitle" class="modal-title">Chemical Details</h3>
+            <button id="closeModal" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="detail-grid">
+                <div class="detail-group">
+                    <div class="detail-label">Chemical Name</div>
+                    <div id="chemical-name" class="detail-value"></div>
+                </div>
+                <div class="detail-group">
+                    <div class="detail-label">Chemical Description</div>
+                    <div id="chemical-description" class="detail-value"></div>
+                </div>
+                <div class="detail-group">
+                    <div class="detail-label">CAS Number</div>
+                    <div id="chemical-cas" class="detail-value"></div>
+                </div>
+                <div class="detail-group">
+                    <div class="detail-label">Chemical Formula</div>
+                    <div id="chemical-formula" class="detail-value"></div>
+                </div>
+                <div class="detail-group">
+                    <div class="detail-label">Molecular Weight</div>
+                    <div id="chemical-weight" class="detail-value"></div>
+                </div>
+                <div class="detail-group">
+                    <div class="detail-label">Physical State</div>
+                    <div id="chemical-state" class="detail-value"></div>
+                </div>
+                <div class="detail-group">
+                    <div class="detail-label">Signal Word</div>
+                    <div id="chemical-signal" class="detail-value"></div>
+                </div>
+                <div class="detail-group">
+                    <div class="detail-label">Hazard Classification</div>
+                    <div id="chemical-hazard" class="detail-value"></div>
+                </div>
+                <div class="detail-group">
+                    <div class="detail-label">SDS</div>
+                    <div id="chemical-sds" class="detail-value">
+                        <a id="sds-link" href="#" target="_blank">View Safety Data Sheet</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="detail-group">
+                <div class="detail-label">Location</div>
+                <div class="detail-value">
+                    <span id="building-name"></span> - 
+                    Lab Room: <span id="lab-room"></span>, 
+                    Locker: <span id="locker-number"></span>
+                </div>
+            </div>
+            
+            <div class="quantity-group">
+                <div class="detail-grid">
+                    <div class="detail-group">
+                        <div class="detail-label">Quantity</div>
+                        <div id="chemical-quantity" class="detail-value"></div>
+                    </div>
+                    <div class="detail-group">
+                        <div class="detail-label">Reorder Quantity</div>
+                        <div id="chemical-reorder" class="detail-value"></div>
+                    </div>
+                    <div class="detail-group">
+                        <div class="detail-label">Unit of Measure</div>
+                        <div id="chemical-uom" class="detail-value"></div>
+                    </div>
+                </div>
+                <div class="quantity-actions">
+                    <button id="receiveBtn" class="btn">Receive Material</button>
+                    <button id="checkoutBtn" class="btn">Check Out Material</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

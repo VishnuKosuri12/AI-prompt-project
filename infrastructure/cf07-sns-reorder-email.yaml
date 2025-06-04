@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for ChemTrack reorder notification system'
+
+Parameters:
+  AppName:
+    Type: String
+    Description: Name of the application
+    Default: chemtrack
+  BackendUrl:
+    Type: String
+    Description: URL of the backend API
+    Default: https://chemtrack.767397980456.aws.glpoly.net
+  VpcId:
+    Type: String
+    Description: VPC ID where the ECS cluster will be deployed
+    Default: vpc-019e35a7f8ca205e5
+  PrivateSubnet1:
+    Type: String
+    Description: First private subnet ID for the ECS cluster
+    Default: subnet-08de8ae010ebfa1f3
+  PrivateSubnet2:
+    Type: String
+    Description: Second private subnet ID for the ECS cluster
+    Default: subnet-0205ddf1053073b5c
+
+Resources:
+  # SNS Topic for sending reorder notifications
+  ReorderSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub ${AppName}-reorder-sns
+      DisplayName: !Sub ${AppName} Reorder Notifications
+      Tags:
+        - Key: Application
+          Value: !Ref AppName
+
+  # Lambda execution role
+  ReorderLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: !Sub ${AppName}-reorder-notification-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref ReorderSNSTopic
+        - PolicyName: !Sub "${AppName}-lambda_access-policy"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                Resource: '*'
+        - PolicyName: !Sub "${AppName}-parameter-store-policy"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/chemtrack-api-key"
+
+      RoleName: !Sub ${AppName}-reorder-lambda-role
+      Tags:
+        - Key: Application
+          Value: !Ref AppName
+
+  # Security Groups
+  ReorderLambdaSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the reorder lambda
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-alb-sg
+
+  # Lambda function for sending reorder notifications
+  ReorderLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${AppName}-reorder-notification
+      Description: Lambda function that sends notifications for chemicals that need to be reordered
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt ReorderLambdaExecutionRole.Arn
+      Runtime: python3.12
+      Timeout: 60
+      MemorySize: 128
+      Environment:
+        Variables:
+          BACKEND_URL: !Ref BackendUrl
+          SNS_TOPIC_ARN: !Ref ReorderSNSTopic
+      Code:
+        S3Bucket: !ImportValue
+          Fn::Sub: "ChemtrackProjectBucketName"
+        S3Key: reorder-notification.zip
+      Tags:
+        - Key: Application
+          Value: !Ref AppName
+      VpcConfig:
+        SubnetIds:
+          - !Ref PrivateSubnet1
+          - !Ref PrivateSubnet2
+        SecurityGroupIds:
+          - !Ref ReorderLambdaSG
+
+  # CloudWatch Event Rule to trigger the Lambda function once per day at 3pm
+  ReorderScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub ${AppName}-reorder-daily-trigger
+      Description: Triggers the reorder notification Lambda function daily at 3pm
+      ScheduleExpression: cron(0 15 * * ? *)  # Run at 3:00 PM UTC every day
+      State: ENABLED
+      Targets:
+        - Id: !Sub ${AppName}-reorder-lambda-target
+          Arn: !GetAtt ReorderLambdaFunction.Arn
+
+  # Permission for CloudWatch Events to invoke the Lambda function
+  ReorderLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ReorderLambdaFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ReorderScheduleRule.Arn
+
+Outputs:
+  SNSTopicArn:
+    Description: ARN of the SNS Topic for reorder notifications
+    Value: !Ref ReorderSNSTopic
+    Export:
+      Name: !Sub ${AppName}-reorder-sns-arn
+
+  ReorderLambdaArn:
+    Description: ARN of the Lambda function for reorder notifications
+    Value: !GetAtt ReorderLambdaFunction.Arn
+    Export:
+      Name: !Sub ${AppName}-reorder-lambda-arn

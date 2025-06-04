@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChemTrack - Login</title>
+    <link rel="stylesheet" href="{{static_url}}/styles.css">
+    <style>
+        .login-shortcuts {
+            margin-top: var(--spacing-lg);
+            text-align: center;
+            border-top: 1px solid var(--gray-light);
+            padding-top: var(--spacing-md);
+        }
+        .login-shortcuts p {
+            color: var(--gray-dark);
+            font-size: 0.9rem;
+            margin-bottom: var(--spacing-sm);
+        }
+        .shortcut-links {
+            display: flex;
+            justify-content: center;
+            gap: var(--spacing-md);
+        }
+        .shortcut-links a {
+            padding: var(--spacing-xs) var(--spacing-sm);
+            background-color: var(--light-color);
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+        .shortcut-links a:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <h1 class="login-title">ChemTrack</h1>
+                <p class="login-subtitle">Chemical Inventory Management System</p>
+            </div>
+            
+            <form class="login-form" method="POST" action="/login">
+                <div class="form-group">
+                    <label for="username" class="form-label">Username</label>
+                    <input type="text" id="username" name="username" class="form-control" required autofocus>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" id="password" name="password" class="form-control" required>
+                </div>
+                
+                {% if error %}
+                <div class="form-error text-error">{{ error }}</div>
+                {% endif %}
+                
+                <button type="submit" class="btn btn-primary">Login</button>
+            </form>
+            
+            <div class="login-shortcuts">
+                <p>Quick Login:</p>
+                <div class="shortcut-links">
+                    <a href="#" onclick="quickLogin('sally')">Sally</a>
+                    <a href="#" onclick="quickLogin('john')">John</a>
+                    <a href="#" onclick="quickLogin('bob')">Bob</a>
+                    <a href="#" onclick="quickLogin('oscar')">Oscar</a>
+                    <a href="#" onclick="quickLogin('steve')">Steve</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function quickLogin(username) {
+            document.getElementById('username').value = username;
+            document.getElementById('password').value = username;
+            document.querySelector('.login-form').submit();
+        }
+    </script>
+</body>
+</html>

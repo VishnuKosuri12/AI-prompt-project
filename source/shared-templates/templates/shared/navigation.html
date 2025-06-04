@@ -1,0 +1,66 @@
+<!-- Navigation Sidebar -->
+<nav class="nav-sidebar">
+    <ul class="nav-list">
+        <!-- Home - visible to all users -->
+        <li class="nav-item">
+            <a href="{{main_url}}/" class="nav-link {% if active_page == 'home' %}active{% endif %}">
+                <span class="nav-icon">🏠</span>
+                Home
+            </a>
+        </li>
+        
+        <!-- Search - visible to all users -->
+        <li class="nav-item">
+            <a href="{{search_url}}" class="nav-link {% if active_page == 'search' %}active{% endif %}">
+                <span class="nav-icon">🔍</span>
+                Search
+            </a>
+        </li>
+        
+        <!-- Reports - visible to all users -->
+        <li class="nav-item">
+            <a href="{{reports_url}}/reports" class="nav-link {% if active_page == 'reports' %}active{% endif %}">
+                <span class="nav-icon">📊</span>
+                Reports
+            </a>
+        </li>
+        
+        <!-- Recipes - visible only to technicians, managers and administrators -->
+        {% if role in ['technician', 'manager', 'administrator'] %}
+        <li class="nav-item">
+            <a href="{{recipes_url}}/recipes" class="nav-link {% if active_page == 'recipes' %}active{% endif %}">
+                <span class="nav-icon">🧪</span>
+                Recipes
+            </a>
+        </li>
+        {% endif %}
+        
+        <!-- Administration - visible only to administrators and managers -->
+        {% if role in ['administrator', 'manager'] %}
+        <li class="nav-item">
+            <a href="{{admin_url}}/admin" class="nav-link {% if active_page == 'admin' %}active{% endif %}">
+                <span class="nav-icon">⚙️</span>
+                Administration
+            </a>
+            {% if active_page == 'admin' %}
+            <div style="margin-left: 20px;">
+                <ul class="nav-submenu">
+                    <li class="nav-subitem">
+                        <a href="{{admin_url}}/admin/users" class="nav-sublink {% if current_path and '/admin/users' in current_path %}active{% endif %}">
+                            <span class="nav-icon">👤</span>
+                            Users
+                        </a>
+                    </li>
+                    <li class="nav-subitem">
+                        <a href="{{admin_url}}/admin/locations" class="nav-sublink {% if current_path and '/admin/locations' in current_path %}active{% endif %}">
+                            <span class="nav-icon">📍</span>
+                            Locations
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            {% endif %}
+        </li>
+        {% endif %}
+    </ul>
+</nav>
