@@ -8,7 +8,7 @@ scrape_configs:
       - targets: ['localhost:9090']
 
   # ECS Service Connect discovery - comment out services that don't have metrics endpoints
-  - job_name: 'service-connect'
+  - job_name: "service-connect"
     static_configs:
       - targets: 
         # Include only the services that have /metrics endpoints
