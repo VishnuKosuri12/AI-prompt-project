@@ -13,7 +13,7 @@ Parameters:
   VpcId:
     Type: String
     Description: VPC ID where the ECS cluster will be deployed
-    Default: vpc-019e35a7f8ca205e5
+    Default: vpc-019e35a7f8ca205e4
   PrivateSubnet1:
     Type: String
     Description: First private subnet ID for the ECS cluster
