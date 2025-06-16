@@ -1,6 +1,6 @@
 # ChemTrack Application
 
-ChemTrack is a chemical tracking application designed for multiple users across many labs. Each lab maintains its own list of chemicals, and users can check out quantities, check in new purchases, reconcile inventory, search for chemicals by characteristics, and mark chemicals for deletion when no longer available.
+ChemTrack is a chemical tracking application designed for multiple users across many labs. Each lab maintains its own list of chemicals, and users can check out quantities, check in new purchases, reconcile inventory, search for chemicals by characteristics, and mark chemicals for deletion when no longer available
 
 ## Project Structure
 
