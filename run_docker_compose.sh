@@ -2,6 +2,7 @@
 
 # Script to run the ChemTrack application using Docker Compose
 # Usage: ./run_docker_compose.sh
+# 
 
 # Check if AWS credentials are set
 if [[ -z "${AWS_ACCESS_KEY_ID}" || -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
@@ -55,4 +56,4 @@ echo "To view logs, run:"
 echo "docker compose logs -f"
 echo ""
 echo "To stop the application, run:"
-echo "docker compose down"
+echo "docker compose down" 
