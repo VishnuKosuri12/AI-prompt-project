@@ -79,4 +79,4 @@ A hybrid approach is recommended:
    - Use existing Docker containers for consistent test environments
    - Create a test-specific docker-compose file with test databases
 
-This approach provides a comprehensive testing strategy that can start with module-level testing and expand to full end-to-end testing as needed.
+This approach provides a comprehensive testing strategy that can start with module-level testing and expand to full end-to-end testing as needed with automated test scripts.
