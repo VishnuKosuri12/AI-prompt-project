@@ -98,3 +98,4 @@ Revisions
 1) I've added another task to @/TASK03.md.  Please implement #5
 2) When I try to login and hit the login button I get the message "Could not connect to authentication service".  I looked at the log for the backend and it doesn't appear that it was called.
 3) Manually worked out getting local environment running, database connection issues, and had cline rework main.py to switch it to psycopg2
+4)Need to revisit this.
