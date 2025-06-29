@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 # Navigate to the script directory
@@ -45,3 +46,4 @@ fi
 
 # Note: Old mock-based tests (test_backend.py and test_integration.py) have been 
 # removed as per task #7 requirements. Tests now connect directly to the database.
+#12
