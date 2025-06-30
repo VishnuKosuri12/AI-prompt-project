@@ -40,3 +40,4 @@ INSERT INTO user_preferences (user_name, preference_key, preference_value) VALUE
 
 -- Create index for faster lookups
 CREATE INDEX idx_user_preferences_user_name ON user_preferences(user_name);
+#1212
