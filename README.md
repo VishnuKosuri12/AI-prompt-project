@@ -610,7 +610,7 @@ Usage:
 
 ```powershell
 # Build and push containers to ECR (default region: us-east-1)
-.\scripts\Build-And-Push.ps1
+.\scripts\Build-And-Push.ps1 #1212
 
 # Build and push containers to a specific AWS region
 .\scripts\Build-And-Push.ps1 -AwsRegion "us-west-2"
