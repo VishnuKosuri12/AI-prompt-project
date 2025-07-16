@@ -139,3 +139,4 @@ Outputs:
     Value: !Ref SharedTemplatesTargetGroup
     Export:
       Name: !Sub "${AppName}-shared-templates-target-group-arn"
+      #1212
