@@ -19,3 +19,4 @@
 - Data should be stored in PostgreSQL
 - Scripts should be created for all database structures and should be written for psql
 - All scripts should be placed in the scripts folder
+#1212
