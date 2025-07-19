@@ -13,4 +13,3 @@ GRANT SELECT, UPDATE ON users TO chemuser;
 -- Update existing users to have last_reset set to one week ago
 UPDATE users SET last_reset = CURRENT_TIMESTAMP - INTERVAL '7 days';
 
-#1212
