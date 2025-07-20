@@ -1,58 +1,60 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Description: 'CloudFormation template for ChemTrack PostgreSQL RDS database'
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Deploy a PostgreSQL RDS instance for the ChemTrack application,
+  including networking, subnet group, parameter group, and security.
 
 Parameters:
   AppName:
     Type: String
-    Description: Name of the application
     Default: chemtrack
+    Description: Application name (will prefix resource names)
 
   VpcId:
     Type: String
-    Description: VPC ID where the database will be deployed
     Default: vpc-019e35a7f8ca205e5
+    Description: VPC ID for deployment
 
   PrivateSubnet1:
     Type: String
-    Description: First private subnet ID for the database
     Default: subnet-08de8ae010ebfa1f3
+    Description: First private subnet
 
   PrivateSubnet2:
     Type: String
-    Description: Second private subnet ID for the database
     Default: subnet-0205ddf1053073b5c
+    Description: Second private subnet
 
   DBInstanceClass:
     Type: String
-    Description: Database instance class
+    Default: db.t4g.medium
+    Description: RDS instance class
     AllowedValues:
       - db.t4g.medium
       - db.t4g.large
       - db.r6g.large
-    Default: db.t4g.medium
 
   BackupRetentionPeriod:
     Type: Number
-    Description: Number of days to retain automated backups
+    Default: 14
     MinValue: 1
     MaxValue: 35
-    Default: 14
+    Description: Days to retain automated backups
 
   PreferredBackupWindow:
     Type: String
-    Description: The daily time range during which automated backups are created
-    Default: 22:00-22:59
+    Default: "22:00-22:59"
+    Description: Daily backup window
 
   PreferredMaintenanceWindow:
     Type: String
-    Description: The weekly time range during which system maintenance can occur
-    Default: sat:23:00-sat:23:59
+    Default: "sat:23:00-sat:23:59"
+    Description: Weekly maintenance window
 
 Resources:
   DBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for PostgreSQL RDS database
+      GroupDescription: PostgreSQL access security group
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -61,87 +63,18 @@ Resources:
           CidrIp: 10.0.0.0/8
       Tags:
         - Key: Name
-          Value: !Sub ${AppName}-db-sg
+          Value: !Sub "${AppName}-db-sg"
 
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
-      DBSubnetGroupDescription: Subnet group for PostgreSQL RDS database
+      DBSubnetGroupDescription: Private subnet group for RDS
       SubnetIds:
         - !Ref PrivateSubnet1
         - !Ref PrivateSubnet2
       Tags:
         - Key: Name
-          Value: !Sub ${AppName}-db-subnet-group
+          Value: !Sub "${AppName}-db-subnet-group"
 
   DBParameterGroup:
     Type: AWS::RDS::DBParameterGroup
-    Properties:
-      Description: Parameter group for PostgreSQL RDS database
-      Family: postgres17
-      Parameters:
-        rds.force_ssl: 0
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-db-parameter-group
-
-  PostgreSQLDB:
-    Type: AWS::RDS::DBInstance
-    Properties:
-      DBInstanceIdentifier: !Sub ${AppName}-db
-      AllocatedStorage: 20
-      MaxAllocatedStorage: 500
-      StorageType: gp3
-      Engine: postgres
-      EngineVersion: '17.4'
-      DBInstanceClass: !Ref DBInstanceClass
-      DBSubnetGroupName: !Ref DBSubnetGroup
-      VPCSecurityGroups:
-        - !GetAtt DBSecurityGroup.GroupId
-      DBParameterGroupName: !Ref DBParameterGroup
-      MasterUsername: !Join ['', ['{{resolve:secretsmanager:', 'chemtrack-db-admin-user', ':SecretString:username}}' ]]
-      MasterUserPassword: !Join ['', ['{{resolve:secretsmanager:', 'chemtrack-db-admin-user', ':SecretString:password}}' ]]
-      BackupRetentionPeriod: !Ref BackupRetentionPeriod
-      PreferredBackupWindow: !Ref PreferredBackupWindow
-      PreferredMaintenanceWindow: !Ref PreferredMaintenanceWindow
-      MultiAZ: false
-      PubliclyAccessible: false
-      StorageEncrypted: true
-      DeletionProtection: false
-      EnablePerformanceInsights: false
-      MonitoringInterval: 0
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-db
-
-Outputs:
-  DBInstanceIdentifier:
-    Description: The database instance identifier
-    Value: !Ref PostgreSQLDB
-    Export:
-      Name: !Sub ${AppName}-db-identifier
-
-  DBInstanceEndpoint:
-    Description: The connection endpoint for the database
-    Value: !GetAtt PostgreSQLDB.Endpoint.Address
-    Export:
-      Name: !Sub ${AppName}-db-endpoint
-
-  DBInstancePort:
-    Description: The port the database is listening on
-    Value: !GetAtt PostgreSQLDB.Endpoint.Port
-    Export:
-      Name: !Sub ${AppName}-db-port
-
-  DBSecurityGroupId:
-    Description: The security group ID for the database
-    Value: !GetAtt DBSecurityGroup.GroupId
-    Export:
-      Name: !Sub ${AppName}-db-security-group-id
-
-  DBInstanceArn:
-    Description: The ARN of the database instance
-    Value: !GetAtt PostgreSQLDB.DBInstanceArn
-    Export:
-      Name: !Sub ${AppName}-db-arn
-#who created this 12
