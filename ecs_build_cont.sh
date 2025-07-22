@@ -64,3 +64,5 @@ build_and_push $CONTAINER_NAME
 
 echo ""
 echo "done"
+
+#1212
