@@ -1,115 +1,105 @@
-# -----------------------
-# General Python ignores
-# -----------------------
+# -----------------------------------------------------------------------------
+# Python Environment and Bytecode
+# -----------------------------------------------------------------------------
+# Byte-compiled files
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Dynamically generated libraries and eggs
 *.so
 *.egg
 *.egg-info/
 .installed.cfg
 .Python
+*.whl
 
-# -----------------------
-# Distribution / Packaging
-# -----------------------
-build/
-dist/
-downloads/
-develop-eggs/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-MANIFEST
-
-# -----------------------
-# Virtual Environments
-# -----------------------
+# Virtual environments
 env/
 venv/
 ENV/
 .venv/
-env.bak/
-venv.bak/
-
-# -----------------------
-# Dependency Managers
-# -----------------------
-
-# pipenv
-# Pipfile.lock (optional, comment out if using cross-platform)
-# Pipfile.lock
-
-# poetry
-# poetry.lock (optional, comment out if library)
-# poetry.lock
-
-# pdm
-# pdm.lock (optional, comment out if library)
-# pdm.lock
-.pdm.toml
-.pdm-python
-.pdm-build/
-
-# pyflow / PEP 582
 __pypackages__/
 
-# -----------------------
-# Logs and Debug
-# -----------------------
-pip-log.txt
-pip-delete-this-directory.txt
-*.log
-cython_debug/
-
-# -----------------------
-# Test, Coverage, CI
-# -----------------------
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.pytest_cache/
-.hypothesis/
-
-# -----------------------
-# Project Configs
-# -----------------------
+# -----------------------------------------------------------------------------
+# IDE and Editor-specific Files
+# -----------------------------------------------------------------------------
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
 .spyderproject
 .spyproject
 .ropeproject
-.pybuilder/
-target/
 .mypy_cache/
+.pyre/
+.pytype/
+.ruff_cache/
 .dmypy.json
 dmypy.json
-.pytype/
-.pyre/
-.ruff_cache/
 
-# -----------------------
-# Jupyter / IPython
-# -----------------------
-.ipynb_checkpoints/
-profile_default/
-ipython_config.py
+# -----------------------------------------------------------------------------
+# Build and Distribution Artifacts
+# -----------------------------------------------------------------------------
+build/
+dist/
+develop-eggs/
+eggs/
+.eggs/
+parts/
+sdist/
+lib/
+lib64/
+wheels/
+share/python-wheels/
+MANIFEST
+.pdm-build/
 
-# -----------------------
-# Frameworks
-# -----------------------
+# -----------------------------------------------------------------------------
+# Dependency Management Files
+# -----------------------------------------------------------------------------
+# Pip
+pip-log.txt
+pip-delete-this-directory.txt
 
+# Pipenv
+Pipfile.lock
+
+# Poetry
+poetry.lock
+
+# PDM
+pdm.lock
+.pdm.toml
+.pdm-python
+
+# -----------------------------------------------------------------------------
+# Testing and Coverage
+# -----------------------------------------------------------------------------
+# Coverage files
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+
+# Test runners
+.pytest_cache/
+.tox/
+.nox/
+nosetests.xml
+.hypothesis/
+
+# -----------------------------------------------------------------------------
+# Logs and Runtime Data
+# -----------------------------------------------------------------------------
+*.log
+.cache/
+cython_debug/
+
+# -----------------------------------------------------------------------------
+# Frameworks and Tools
+# -----------------------------------------------------------------------------
 # Django
 local_settings.py
 db.sqlite3
@@ -123,4 +113,9 @@ instance/
 .scrapy/
 
 # Celery
-celerybea
+celerybeat-schedule
+
+# Jupyter / IPython
+.ipynb_checkpoints/
+profile_default/
+ipython_config.py
