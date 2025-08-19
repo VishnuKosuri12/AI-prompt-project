@@ -1,116 +1,81 @@
+# Specifies the version of the CloudFormation template language.
 AWSTemplateFormatVersion: '2010-09-09'
+
+# A description of the template's purpose, which will appear in the CloudFormation console.
 Description: 'CloudFormation template for ChemTrack Database Network Load Balancer'
 
+# Defines input values that users can customize when creating the stack.
 Parameters:
+  # A parameter for the application's name, used for consistent naming of resources.
   AppName:
     Type: String
     Description: Name of the application
     Default: chemtrack
 
+  # A parameter for the VPC ID where the NLB will be created.
   VpcId:
     Type: String
     Description: VPC ID where the NLB will be deployed
     Default: vpc-019e35a7f8ca205e5
 
+  # A parameter for the first intranet subnet ID for the NLB.
   IntranetSubnet1:
     Type: String
     Description: First intranet subnet ID for the NLB
     Default: subnet-0ee959776d1683aa5
 
+  # A parameter for the second intranet subnet ID for the NLB.
   IntranetSubnet2:
     Type: String
     Description: Second intranet subnet ID for the NLB
     Default: subnet-07257f93f815ce77c
 
+  # A parameter for the IP address of the database. This is used for the target group.
   DatabaseIP:
     Type: String
     Description: IP address of the database for the target group
     Default: ''
 
+# Defines the AWS resources to be provisioned by the template.
 Resources:
+  # Defines a Network Load Balancer (NLB) resource.
   DatabaseNLB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
+      # Sets the name of the NLB using the AppName parameter. The '!Sub' function substitutes the variable.
       Name: !Sub ${AppName}-db-nlb
+      # Specifies the type of load balancer as a network load balancer.
       Type: network
+      # Sets the load balancer's scheme to 'internal,' making it only accessible within the VPC.
       Scheme: internal
+      # Associates the NLB with the two specified intranet subnets.
       Subnets:
         - !Ref IntranetSubnet1
         - !Ref IntranetSubnet2
+      # Adds a tag to the NLB for identification.
       Tags:
         - Key: Name
           Value: !Sub ${AppName}-db-nlb
 
+  # Defines a Target Group resource to route traffic to the database.
   DatabaseTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
+      # Sets the name of the target group.
       Name: !Sub ${AppName}-db-tg
+      # Specifies the port for traffic to be routed to, in this case, the standard PostgreSQL port.
       Port: 5432
+      # Specifies the protocol for the target group (TCP).
       Protocol: TCP
+      # Associates the target group with the specified VPC.
       VpcId: !Ref VpcId
+      # Specifies that targets are identified by IP address.
       TargetType: ip
+      # Defines the target for the target group using the provided DatabaseIP parameter.
       Targets:
         - Id: !Ref DatabaseIP
           Port: 5432
+      # Enables health checks for the targets.
       HealthCheckEnabled: true
-      HealthCheckPort: 5432
-      HealthCheckProtocol: TCP
-      HealthCheckIntervalSeconds: 30
-      HealthCheckTimeoutSeconds: 10
-      HealthyThresholdCount: 3
-      UnhealthyThresholdCount: 3
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-db-tg
-
-  DatabaseListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      LoadBalancerArn: !Ref DatabaseNLB
-      Port: 5432
-      Protocol: TCP
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref DatabaseTargetGroup
-
-  DatabaseDNSRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneName: 767397980456.aws.glpoly.net.
-      Name: "ctrds.767397980456.aws.glpoly.net"
-      Type: CNAME
-      TTL: 300
-      ResourceRecords:
-        - !GetAtt DatabaseNLB.DNSName
-
-Outputs:
-  DatabaseNLBArn:
-    Description: ARN of the database network load balancer
-    Value: !Ref DatabaseNLB
-    Export:
-      Name: !Sub ${AppName}-db-nlb-arn
-
-  DatabaseNLBDNSName:
-    Description: DNS name of the database network load balancer
-    Value: !GetAtt DatabaseNLB.DNSName
-    Export:
-      Name: !Sub ${AppName}-db-nlb-dns-name
-
-
-  DatabaseTargetGroupArn:
-    Description: ARN of the database target group
-    Value: !Ref DatabaseTargetGroup
-    Export:
-      Name: !Sub ${AppName}-db-tg-arn
-
-  DatabaseListenerArn:
-    Description: ARN of the database listener
-    Value: !Ref DatabaseListener
-    Export:
-      Name: !Sub ${AppName}-db-listener-arn
-
-  DatabaseDNSRecordName:
-    Description: DNS record name for the database
-    Value: "ctrds.767397980456.aws.glpoly.net"
-    Export:
-      Name: !Sub ${AppName}-db-dns-record-name
+      # Sets the health check port.
+      HealthCheck
