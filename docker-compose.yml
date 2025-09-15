@@ -1,3 +1,24 @@
+# Define a reusable block for common frontend/API service properties
+x-common-app-config: &common-app-config
+  build:
+    context: ./source/app-name # This will be overridden in each service
+  container_name: ct-app-name # This will be overridden
+  ports:
+    - "8000:8000" # This will be overridden
+  environment:
+    - BASE_URL=
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+    interval: 10s
+    timeout: 5s
+    retries: 3
+    start_period: 5s
+  depends_on:
+    backend:
+      condition: service_healthy
+  networks:
+    - chemtrack-network
+
 services:
   backend:
     build:
@@ -21,44 +42,20 @@ services:
       - chemtrack-network
 
   login:
+    <<: *common-app-config
     build:
       context: ./source/login
     container_name: ct-login
     ports:
       - "8001:8000"
-    environment:
-      - BASE_URL=
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - chemtrack-network
 
   main:
+    <<: *common-app-config
     build:
       context: ./source/main
     container_name: ct-main
     ports:
       - "8003:8000"
-    environment:
-      - BASE_URL=
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - chemtrack-network
 
   nginx:
     build:
@@ -78,26 +75,15 @@ services:
       - chemtrack-network
 
   search:
+    <<: *common-app-config
     build:
       context: ./source/search
     container_name: ct-search
     ports:
       - "8004:8000"
-    environment:
-      - BASE_URL=
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - chemtrack-network
 
   shared-templates:
+    <<: *common-app-config
     build:
       context: ./source/shared-templates
     container_name: ct-shared-templates
@@ -107,79 +93,33 @@ services:
       - BASE_URL=
       - SECRETS_SERVICE_URL=http://ct-secrets:8099
       - LOCAL_DEV=true
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - chemtrack-network
 
   admin:
+    <<: *common-app-config
     build:
       context: ./source/admin
     container_name: ct-admin
     ports:
       - "8006:8000"
-    environment:
-      - BASE_URL=
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - chemtrack-network
-      
+
   recipes:
+    <<: *common-app-config
     build:
       context: ./source/recipes
     container_name: ct-recipes
     ports:
       - "8007:8000"
-    environment:
-      - BASE_URL=
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - chemtrack-network
-      
+
   reports:
+    <<: *common-app-config
     build:
       context: ./source/reports
     container_name: ct-reports
     ports:
       - "8008:8000"
-    environment:
-      - BASE_URL=
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - chemtrack-network
-      
+
   secrets:
+    <<: *common-app-config
     build:
       context: ./source/secrets
     container_name: ct-secrets
@@ -190,17 +130,7 @@ services:
       - API_KEY_PARAM_NAME=chemtrack-api-key
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8099/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - chemtrack-network
 
 networks:
   chemtrack-network:
     name: chemtrack
-    #1212
