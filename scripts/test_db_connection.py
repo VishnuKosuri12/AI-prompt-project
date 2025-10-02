@@ -2,148 +2,184 @@
 import os
 import sys
 import json
+import logging
+from contextlib import closing
+
 import boto3
 import psycopg2
-import logging
+from psycopg2 import sql, OperationalError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def get_db_connection():
-    """Get database connection from AWS Secrets Manager or local configuration"""
-    try:
-        # Get database URL from AWS Secrets Manager
-        aws_region = os.environ.get('AWS_REGION', 'us-east-1')
-        session = boto3.session.Session(region_name=aws_region)
-        client = session.client(service_name='secretsmanager', region_name=aws_region)
-        secret_name = "env-vars"
-        
-        # Get the secret value
-        get_secret_value_response = client.get_secret_value(SecretId=secret_name)
-        secret = json.loads(get_secret_value_response['SecretString'])
-        db_url = secret.get('db_url')
-        
-        # Get database credentials from AWS Secrets Manager
-        secret_name = "chemtrack-db-app-user"
-        get_secret_value_response = client.get_secret_value(SecretId=secret_name)
-        db_creds = json.loads(get_secret_value_response['SecretString'])
-        username = db_creds.get('username')
-        password = db_creds.get('password')
 
-        # Parse the db_url to get host
-        # Assuming db_url is in format: hostname:port or just hostname
-        host = db_url.split(':')[0] if ':' in db_url else db_url
-        logger.info(f"Connecting to database: {host} as {username}")
-        
-        # Create database connection
+def get_secret(secret_name: str, region: str):
+    """Retrieve a secret from AWS Secrets Manager as a dict."""
+    session = boto3.session.Session(region_name=region)
+    client = session.client(service_name="secretsmanager", region_name=region)
+    response = client.get_secret_value(SecretId=secret_name)
+    return json.loads(response["SecretString"])
+
+
+def get_db_connection():
+    """Obtain a PostgreSQL connection using credentials from Secrets Manager."""
+    try:
+        aws_region = os.environ.get("AWS_REGION", "us-east-1")
+        # Secret that holds the DB endpoint/URL
+        env_secret = get_secret("env-vars", aws_region)
+        db_url = env_secret.get("db_url")
+        if not db_url:
+            raise KeyError("db_url not found in secret 'env-vars'")
+
+        # Secret holding the DB credentials
+        cred_secret = get_secret("chemtrack-db-app-user", aws_region)
+        username = cred_secret.get("username")
+        password = cred_secret.get("password")
+        if not username or not password:
+            raise KeyError("username or password missing in secret 'chemtrack-db-app-user'")
+
+        # Parse host and optional port (default 5432)
+        if ":" in db_url:
+            host, port = db_url.split(":", maxsplit=1)
+        else:
+            host, port = db_url, 5432
+
+        logger.info(f"Connecting to DB host={host}, user={username}")
+
         conn = psycopg2.connect(
             dbname="chemtrack",
             user=username,
             password=password,
             host=host,
-            port=5432
+            port=int(port),
         )
         return conn
-    except Exception as e:
-        logger.error(f"Database connection error: {str(e)}")
+
+    except Exception as exc:
+        logger.error(f"Failed to get DB connection: {exc}")
         return None
 
+
 def test_connection():
-    """Test database connection"""
+    """Test if the database connection can be established."""
     conn = get_db_connection()
     if conn:
-        logger.info("Database connection successful")
+        logger.info("Database connection successful.")
+        conn.close()
         return True
     else:
-        logger.error("Database connection failed")
+        logger.error("Database connection failed.")
         return False
+
 
 def check_users_table():
-    """Check if users table exists and has pswd_reset column"""
+    """Verify that table `users` exists and has column `pswd_reset`, and sample its data."""
     conn = get_db_connection()
-    if not conn:
+    if conn is None:
         return False
-    
-    cursor = conn.cursor()
-    try:
-        # Check if users table exists
-        cursor.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'users')")
-        table_exists = cursor.fetchone()[0]
-        if not table_exists:
-            logger.error("Users table does not exist")
-            return False
-        
-        # Check if pswd_reset column exists
-        cursor.execute("SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'pswd_reset')")
-        column_exists = cursor.fetchone()[0]
-        if not column_exists:
-            logger.error("pswd_reset column does not exist in users table")
-            return False
-        
-        logger.info("Users table and pswd_reset column exist")
-        
-        # Check sample user data
-        cursor.execute("SELECT user_name, pswd_reset FROM users LIMIT 5")
-        users = cursor.fetchall()
-        logger.info(f"Sample users: {users}")
-        
-        return True
-    except Exception as e:
-        logger.error(f"Error checking users table: {str(e)}")
-        return False
-    finally:
-        cursor.close()
-        conn.close()
 
-def test_update_pswd_reset(username):
-    """Test updating pswd_reset flag for a user"""
-    conn = get_db_connection()
-    if not conn:
-        return False
-    
-    cursor = conn.cursor()
-    try:
-        # Check if user exists
-        cursor.execute("SELECT user_name FROM users WHERE user_name = %s", (username,))
-        user = cursor.fetchone()
-        if not user:
-            logger.error(f"User {username} does not exist")
+    with closing(conn), conn.cursor() as cursor:
+        try:
+            # Check existence of table
+            cursor.execute(
+                """
+                SELECT EXISTS (
+                  SELECT 1
+                  FROM information_schema.tables
+                  WHERE table_name = %s
+                )
+                """,
+                ("users",),
+            )
+            table_exists = cursor.fetchone()[0]
+            if not table_exists:
+                logger.error("Table `users` does not exist.")
+                return False
+
+            # Check presence of pswd_reset column
+            cursor.execute(
+                """
+                SELECT EXISTS (
+                  SELECT 1
+                  FROM information_schema.columns
+                  WHERE table_name = %s AND column_name = %s
+                )
+                """,
+                ("users", "pswd_reset"),
+            )
+            column_exists = cursor.fetchone()[0]
+            if not column_exists:
+                logger.error("Column `pswd_reset` not found in table `users`.")
+                return False
+
+            logger.info("Table `users` and column `pswd_reset` confirmed.")
+
+            # Fetch sample rows
+            cursor.execute("SELECT user_name, pswd_reset FROM users LIMIT 5")
+            sample = cursor.fetchall()
+            logger.info(f"Sample users: {sample}")
+
+            return True
+
+        except Exception as exc:
+            logger.error(f"Error checking users table: {exc}")
             return False
-        
-        # Get current pswd_reset value
-        cursor.execute("SELECT pswd_reset FROM users WHERE user_name = %s", (username,))
-        current_value = cursor.fetchone()[0]
-        logger.info(f"Current pswd_reset value for {username}: {current_value}")
-        
-        # Update pswd_reset value
-        new_value = 'Y'
-        cursor.execute("UPDATE users SET pswd_reset = %s WHERE user_name = %s", (new_value, username))
-        conn.commit()
-        
-        # Verify update
-        cursor.execute("SELECT pswd_reset FROM users WHERE user_name = %s", (username,))
-        updated_value = cursor.fetchone()[0]
-        logger.info(f"Updated pswd_reset value for {username}: {updated_value}")
-        
-        return updated_value == new_value
-    except Exception as e:
-        logger.error(f"Error updating pswd_reset: {str(e)}")
+
+
+def test_update_pswd_reset(username: str):
+    """Test updating the `pswd_reset` flag for a given user."""
+    conn = get_db_connection()
+    if conn is None:
         return False
-    finally:
-        cursor.close()
-        conn.close()
+
+    with closing(conn), conn.cursor() as cursor:
+        try:
+            cursor.execute("SELECT user_name, pswd_reset FROM users WHERE user_name = %s", (username,))
+            row = cursor.fetchone()
+            if row is None:
+                logger.error(f"User '{username}' does not exist.")
+                return False
+
+            old_value = row[1]
+            logger.info(f"Old pswd_reset for {username}: {old_value}")
+
+            new_value = "Y"
+            cursor.execute(
+                "UPDATE users SET pswd_reset = %s WHERE user_name = %s",
+                (new_value, username),
+            )
+            conn.commit()
+
+            # Verify the update
+            cursor.execute("SELECT pswd_reset FROM users WHERE user_name = %s", (username,))
+            updated = cursor.fetchone()[0]
+            logger.info(f"Updated pswd_reset for {username}: {updated}")
+
+            return updated == new_value
+
+        except Exception as exc:
+            logger.error(f"Error updating pswd_reset for {username}: {exc}")
+            return False
+
+
+def main():
+    logger.info("=== Starting diagnostics ===")
+    if not test_connection():
+        return 1
+
+    logger.info("=== Checking users table ===")
+    check_users_table()
+
+    if len(sys.argv) > 1:
+        username = sys.argv[1]
+        logger.info(f"=== Testing update of pswd_reset for '{username}' ===")
+        if test_update_pswd_reset(username):
+            logger.info(f"Successfully updated pswd_reset for user '{username}'.")
+        else:
+            logger.error(f"Failed to update pswd_reset for user '{username}'.")
+
+    return 0
+
 
 if __name__ == "__main__":
-    logger.info("Testing database connection...")
-    if test_connection():
-        logger.info("Checking users table...")
-        check_users_table()
-        
-        # Test updating pswd_reset for a specific user if provided
-        if len(sys.argv) > 1:
-            username = sys.argv[1]
-            logger.info(f"Testing update of pswd_reset for user {username}...")
-            if test_update_pswd_reset(username):
-                logger.info(f"Successfully updated pswd_reset for {username}")
-            else:
-                logger.error(f"Failed to update pswd_reset for {username}")
+    sys.exit(main())
