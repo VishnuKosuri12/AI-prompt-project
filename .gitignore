@@ -1,11 +1,12 @@
 # -----------------------------------------------------------------------------
 # Python Environment and Bytecode
 # -----------------------------------------------------------------------------
+# Bytecode and compilation artifacts
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Dynamically generated libraries and eggs
+# Dynamically generated libraries, eggs, and wheels
 *.so
 *.egg
 *.egg-info/
@@ -13,32 +14,20 @@ __pycache__/
 .Python
 *.whl
 
-# Virtual environments
+# -----------------------------------------------------------------------------
+# Virtual Environments
+# -----------------------------------------------------------------------------
+# Standard virtual environment directory names
 env/
 venv/
 ENV/
 .venv/
+
+# Python packaging project environments (PEP 582)
 __pypackages__/
 
 # -----------------------------------------------------------------------------
-# IDE and Editor-specific Files
-# -----------------------------------------------------------------------------
-.vscode/
-.idea/
-*.sublime-workspace
-*.sublime-project
-.spyderproject
-.spyproject
-.ropeproject
-.mypy_cache/
-.pyre/
-.pytype/
-.ruff_cache/
-.dmypy.json
-dmypy.json
-
-# -----------------------------------------------------------------------------
-# Build and Distribution Artifacts
+# Build, Distribution, and Packaging Artifacts
 # -----------------------------------------------------------------------------
 build/
 dist/
@@ -73,48 +62,70 @@ pdm.lock
 .pdm-python
 
 # -----------------------------------------------------------------------------
+# IDE and Editor-specific Files
+# -----------------------------------------------------------------------------
+# Integrated Development Environments (IDEs)
+.vscode/           # Visual Studio Code
+.idea/             # JetBrains IDEs (PyCharm, IntelliJ)
+.spyderproject     # Spyder
+.spyproject
+.ropeproject
+
+# Text Editors
+*.sublime-workspace # Sublime Text
+*.sublime-project
+
+# Static Analysis and Caching
+.mypy_cache/       # MyPy
+.pyre/             # Pyre
+.pytype/           # Pytype
+.ruff_cache/       # Ruff
+.dmypy.json
+dmypy.json
+
+# -----------------------------------------------------------------------------
 # Testing and Coverage
 # -----------------------------------------------------------------------------
-# Coverage files
+# Test runners and cache
+.pytest_cache/     # pytest
+.tox/              # tox
+.nox/              # nox
+nosetests.xml      # nose
+
+# Coverage reports
 .coverage
 .coverage.*
 htmlcov/
 coverage.xml
 *.cover
-
-# Test runners
-.pytest_cache/
-.tox/
-.nox/
-nosetests.xml
-.hypothesis/
+.hypothesis/       # Hypothesis data
 
 # -----------------------------------------------------------------------------
-# Logs and Runtime Data
+# Logs, Runtime Data, and Cache
 # -----------------------------------------------------------------------------
 *.log
-.cache/
+.cache/            # General cache directory
 cython_debug/
 
 # -----------------------------------------------------------------------------
 # Frameworks and Tools
 # -----------------------------------------------------------------------------
 # Django
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
+local_settings.py  # Local/sensitive settings
+db.sqlite3         # SQLite database file
+db.sqlite3-journal # SQLite journal file
 
 # Flask
-instance/
+instance/          # Application instance folders
 .webassets-cache
 
 # Scrapy
-.scrapy/
+.scrapy/           # Scrapy cache
 
 # Celery
 celerybeat-schedule
 
 # Jupyter / IPython
-.ipynb_checkpoints/
+.ipynb_checkpoints/ # Notebook checkpoints
 profile_default/
 ipython_config.py
