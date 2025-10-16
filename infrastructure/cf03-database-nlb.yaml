@@ -2,49 +2,55 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
 # Description shown in the CloudFormation console
-Description: 'CloudFormation template for ChemTrack Database Network Load Balancer’
+Description: 'CloudFormation template for ChemTrack Database Network Load Balancer (NLB) and associated Target Group/Listener.'
+
+---
 
 # Input parameters users can override when creating the stack
 Parameters:
   # Application name — used for consistent resource naming
   AppName:
     Type: String
-    Description: Name of the application
+    Description: Name of the application (used as a prefix for resource names).
     Default: chemtrack
 
   # VPC where the NLB will reside
   VpcId:
     Type: String
-    Description: VPC ID where the NLB will be deployed
+    Description: VPC ID where the NLB will be deployed.
     Default: vpc-019e35a7f8ca205e5
 
   # First intranet subnet for the NLB
   IntranetSubnet1:
     Type: String
-    Description: First intranet subnet ID for the NLB
+    Description: First intranet subnet ID for the NLB.
     Default: subnet-0ee959776d1683aa5
 
   # Second intranet subnet for the NLB
   IntranetSubnet2:
     Type: String
-    Description: Second intranet subnet ID for the NLB
+    Description: Second intranet subnet ID for the NLB.
     Default: subnet-07257f93f815ce77c
 
   # IP address of the database (for target group)
   DatabaseIP:
     Type: String
-    Description: IP address of the database for the target group
+    Description: Private IP address of the database (e.g., PostgreSQL instance) for the target group.
     Default: ''
+
+---
 
 # The AWS resources that will be created
 Resources:
-  # Network Load Balancer for the database traffic
+
+  # 1. Network Load Balancer for the database traffic
   DatabaseNLB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       # Name uses the AppName parameter
       Name: !Sub ${AppName}-db-nlb
       Type: network
+      # Scheme is 'internal' since it's for a database in a private subnet
       Scheme: internal
       Subnets:
         - !Ref IntranetSubnet1
@@ -53,17 +59,51 @@ Resources:
         - Key: Name
           Value: !Sub ${AppName}-db-nlb
 
-  # Target group to point to the database instance
+  # 2. Target group to point to the database instance
   DatabaseTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: !Sub ${AppName}-db-tg
+      # Standard PostgreSQL port
       Port: 5432
       Protocol: TCP
       VpcId: !Ref VpcId
+      # The target is specified by an IP address, not an instance ID
       TargetType: ip
       Targets:
+        # Reference the DatabaseIP parameter for the target
         - Id: !Ref DatabaseIP
           Port: 5432
       HealthCheckEnabled: true
       HealthCheckPort: 5432
+      HealthCheckProtocol: TCP
+      HealthCheckTimeoutSeconds: 5
+      HealthCheckIntervalSeconds: 30
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+
+  # 3. Listener to direct traffic from the NLB to the Target Group (This was missing/cut off)
+  DatabaseListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref DatabaseTargetGroup
+      LoadBalancerArn: !Ref DatabaseNLB
+      # The listener listens on the same port as the database
+      Port: 5432
+      Protocol: TCP
+
+---
+
+# Output values that can be used by other stacks or retrieved after creation
+Outputs:
+  NLBArn:
+    Description: The ARN of the created Network Load Balancer.
+    Value: !Ref DatabaseNLB
+  NLBDNSName:
+    Description: The DNS name of the created Network Load Balancer.
+    Value: !GetAtt DatabaseNLB.DNSName
+  TargetGroupArn:
+    Description: The ARN of the created Target Group.
+    Value: !Ref DatabaseTargetGroup
