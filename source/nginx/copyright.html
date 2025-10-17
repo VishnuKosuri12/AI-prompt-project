@@ -3,57 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChemTrack - Copyright</title>
+    <title>ChemTrack | Copyright Information</title>
     <link rel="stylesheet" href="/static/styles.css">
     <style>
-        .copyright-container {
+        /* General layout for full-screen centering */
+        .page-center {
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            padding: var(--spacing-lg);
+            padding: 2rem; /* Using a fixed rem value for clarity */
+            background-color: #f4f7f9; /* Light background for contrast */
+        }
+        
+        /* Content box styling */
+        .copyright-box {
+            max-width: 40rem; /* 640px for a better max-width */
+            width: 100%;
+            background-color: #ffffff;
+            padding: 2.5rem;
+            border-radius: 0.75rem; /* Rounded corners */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
             text-align: center;
         }
         
-        .copyright-content {
-            max-width: 800px;
-            background-color: white;
-            padding: var(--spacing-xl);
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
+        /* Typography adjustments */
+        .app-name {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--primary-color, #0056b3); /* Use fallback color */
+            margin-bottom: 0.5rem;
         }
-        
-        .copyright-logo {
-            margin-bottom: var(--spacing-lg);
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #333;
         }
-        
-        .copyright-title {
-            color: var(--primary-color);
-            margin-bottom: var(--spacing-md);
+
+        .notice-paragraph {
+            margin-bottom: 1rem;
+            line-height: 1.6;
+            color: #555;
+        }
+
+        .return-link {
+            font-weight: 600;
+            color: var(--secondary-color, #007bff);
+            text-decoration: none;
         }
     </style>
 </head>
-<body>
-    <div class="copyright-container">
-        <div class="copyright-content">
-            <div class="copyright-logo">
-                <h1 class="copyright-title">ChemTrack</h1>
-            </div>
-            
-            <h2>Copyright Notice</h2>
-            <p class="mb-3">© 2025 Covestro LLC. All rights reserved.</p>
-            
-            <p class="mb-3">ChemTrack is a proprietary chemical inventory management system developed by and for Covestro LLC.</p>
-            
-            <p class="mb-3">This software and its content are protected by copyright laws and international treaties. Unauthorized reproduction or distribution of this software, or any portion of it, may result in severe civil and criminal penalties, and will be prosecuted to the maximum extent possible under law.</p>
-            
-            <p class="mb-3">All trademarks, service marks, trade names, and product names used in this software are the property of their respective owners.</p>
-            
-            <hr class="mb-3 mt-3">
-            
-            <p><a href="/login">Return to Login</a></p>
-        </div>
-    </div>
+<body class="page-center">
+    <main class="copyright-box">
+        <header>
+            <h1 class="app-name">ChemTrack</h1>
+        </header>
+        
+        <h2 class="section-title">Copyright Notice</h2>
+        
+        <p class="notice-paragraph">© 2025 **Covestro LLC**. All rights reserved.</p>
+        
+        <p class="notice-paragraph">**ChemTrack** is a proprietary chemical inventory management system developed by and for Covestro LLC.</p>
+        
+        <p class="notice-paragraph">This software and its content are protected by copyright laws and international treaties. Unauthorized reproduction or distribution, or any portion of it, may result in severe civil and criminal penalties.</p>
+        
+        <p class="notice-paragraph">All trademarks, service marks, trade names, and product names used herein are the property of their respective owners.</p>
+        
+        <hr style="border: 0; height: 1px; background-color: #ccc; margin: 1.5rem 0;">
+        
+        <footer>
+            <p><a href="/login" class="return-link">Return to Login</a></p>
+        </footer>
+    </main>
 </body>
 </html>
