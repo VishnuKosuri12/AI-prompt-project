@@ -1,44 +1,56 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'CloudFormation template for ChemTrack Search Container'
+Description: 'Deploys an ECS Fargate service for the ChemTrack Search Container, including a Log Group, ALB Target Group, and Listener Rule.'
 
+# --- PARAMETERS ---
 Parameters:
+  # Application Naming
   AppName:
     Type: String
-    Description: Name of the application
+    Description: Base name for all application resources.
     Default: chemtrack
+  
   AppURL:
     Type: String
-    Description: root application url
-    Default: "chemtrack.767397980456.aws.glpoly.net"
+    Description: The root application URL, used for container environment variables.
+    Default: "chemtrack.767397980456.aws.glpoly.net" # Placeholder URL - should be environment-specific
+
+  # Networking
   VpcId:
     Type: String
-    Description: VPC ID where the ECS cluster will be deployed
-    Default: vpc-019e35a7f8ca205e5
+    Description: The VPC ID where the ECS cluster resides.
+    Default: vpc-019e35a7f8ca205e5 # Example VPC ID
+  
   PrivateSubnet1:
     Type: String
-    Description: First private subnet ID for the ECS cluster
-    Default: subnet-08de8ae010ebfa1f3
+    Description: First private subnet ID for the Fargate service.
+    Default: subnet-08de8ae010ebfa1f3 # Example Subnet ID
+  
   PrivateSubnet2:
     Type: String
-    Description: Second private subnet ID for the ECS cluster
-    Default: subnet-0205ddf1053073b5c
+    Description: Second private subnet ID for the Fargate service.
+    Default: subnet-0205ddf1053073b5c # Example Subnet ID
 
+# --- RESOURCES ---
 Resources:
-  # CloudWatch Log Group
+  
+  ## CloudWatch Log Group
   SearchLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub /ecs/${AppName}-search
-      RetentionInDays: 7
-
-  # Target Group
+      LogGroupName: !Sub '/ecs/${AppName}-search'
+      RetentionInDays: 7 # Logs expire after 7 days
+      
+  ---
+  
+  ## ALB Target Group
+  # The target group defines where traffic is sent and health checks for the container.
   SearchTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: !Sub ${AppName}-search-tg
+      Name: !Sub '${AppName}-search-tg'
       Port: 8000
       Protocol: HTTP
-      TargetType: ip
+      TargetType: ip # Required for Fargate
       VpcId: !Ref VpcId
       HealthCheckPath: /health
       HealthCheckProtocol: HTTP
@@ -51,47 +63,51 @@ Resources:
           Value: 60
       Tags:
         - Key: Name
-          Value: !Sub ${AppName}-search-tg
+          Value: !Sub '${AppName}-search-tg'
 
-  # ALB Rule
+  ---
+
+  ## ALB Listener Rule
+  # Forwards traffic from the main HTTPS listener to the Search Target Group based on path.
   SearchRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
-      ListenerArn: !ImportValue chemtrack-https-listener-arn
+      ListenerArn: !ImportValue 'chemtrack-https-listener-arn' # Assumes the listener is created in a separate stack
       Priority: 20
       Conditions:
         - Field: path-pattern
           Values:
-            - /search*
+            - /search* # Routes all traffic starting with /search to this service
       Actions:
         - Type: forward
           TargetGroupArn: !Ref SearchTargetGroup
 
-  # ECS Task Definition
+  ---
+  
+  ## ECS Task Definition (Fargate)
   SearchTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
-      Family: !Sub ${AppName}-search
-      Cpu: '1024'
-      Memory: '2048'
+      Family: !Sub '${AppName}-search'
+      Cpu: '1024' # 1 vCPU
+      Memory: '2048' # 2 GB
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
-      ExecutionRoleArn: !ImportValue chemtrack-ecs-task-execution-role-arn
-      TaskRoleArn: !ImportValue chemtrack-ecs-task-role-arn
+      ExecutionRoleArn: !ImportValue 'chemtrack-ecs-task-execution-role-arn' # Imports IAM role for Fargate
+      TaskRoleArn: !ImportValue 'chemtrack-ecs-task-role-arn' # Imports IAM role for the application inside the container
       ContainerDefinitions:
-        - Name: !Sub ${AppName}-search-container
-          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/chemtrack/search:latest
+        - Name: !Sub '${AppName}-search-container'
+          Image: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/chemtrack/search:latest'
           Essential: true
           PortMappings:
             - ContainerPort: 8000
-              HostPort: 8000
               Protocol: tcp
           Environment:
             - Name: BASE_URL
               Value: !Ref AppURL
             - Name: SECRET_KEY
-              Value: '64df77320c1b5b56396028e0dfc01deb'
+              Value: '64df77320c1b5b56396028e0dfc01deb' # NOTE: Hardcoded secrets should be replaced with AWS Secrets Manager
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -100,56 +116,61 @@ Resources:
               awslogs-stream-prefix: ecs
       Tags:
         - Key: Name
-          Value: !Sub ${AppName}-search-task
+          Value: !Sub '${AppName}-search-task'
 
-  # ECS Service
+  ---
+
+  ## ECS Service
+  # Runs and maintains the desired number of tasks (containers)
   SearchService:
     Type: AWS::ECS::Service
-    DependsOn: SearchRule
+    DependsOn: SearchRule # Ensure the ALB rule is created before the service starts attaching to the TG
     Properties:
-      ServiceName: !Sub ${AppName}-search-service
-      Cluster: !ImportValue chemtrack-cluster-arn
+      ServiceName: !Sub '${AppName}-search-service'
+      Cluster: !ImportValue 'chemtrack-cluster-arn' # Imports the ARN of the main ECS cluster
       TaskDefinition: !Ref SearchTaskDefinition
       LaunchType: FARGATE
-      DesiredCount: 1
+      DesiredCount: 1 # Number of running tasks
       DeploymentConfiguration:
         MinimumHealthyPercent: 100
         MaximumPercent: 200
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
+          AssignPublicIp: DISABLED # Service runs in private subnets
           SecurityGroups:
-            - !ImportValue chemtrack-ecs-security-group-id
+            - !ImportValue 'chemtrack-ecs-security-group-id'
           Subnets:
             - !Ref PrivateSubnet1
             - !Ref PrivateSubnet2
       LoadBalancers:
-        - ContainerName: !Sub ${AppName}-search-container
+        - ContainerName: !Sub '${AppName}-search-container'
           ContainerPort: 8000
           TargetGroupArn: !Ref SearchTargetGroup
       HealthCheckGracePeriodSeconds: 60
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-search-service
+      # Service Connect for internal discovery (optional but included)
       ServiceConnectConfiguration:
         Enabled: true
-        Namespace: !Sub ${AppName}.local
+        Namespace: !Sub '${AppName}.local'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AppName}-search-service'
 
+# --- OUTPUTS ---
 Outputs:
   SearchServiceArn:
-    Description: The ARN of the Search ECS service
+    Description: The ARN of the Search ECS service.
     Value: !Ref SearchService
     Export:
-      Name: !Sub ${AppName}-search-service-arn
+      Name: !Sub '${AppName}-search-service-arn'
 
   SearchTaskDefinitionArn:
-    Description: The ARN of the Search Task Definition
+    Description: The ARN of the Search Task Definition.
     Value: !Ref SearchTaskDefinition
     Export:
-      Name: !Sub ${AppName}-search-task-definition-arn
+      Name: !Sub '${AppName}-search-task-definition-arn'
 
   SearchTargetGroupArn:
-    Description: The ARN of the Search Target Group
+    Description: The ARN of the Search Target Group.
     Value: !Ref SearchTargetGroup
     Export:
-      Name: !Sub ${AppName}-search-target-group-arn
+      Name: !Sub '${AppName}-search-target-group-arn'
