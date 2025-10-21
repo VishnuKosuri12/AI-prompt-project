@@ -1,55 +1,50 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'CloudFormation template for ChemTrack ECS Environment'
+Description: 'ECS Fargate Infrastructure for the ChemTrack application, including cluster, networking, IAM, and base services.'
 
+# ------------------------------------------------------------------
+# Parameters
+# ------------------------------------------------------------------
 Parameters:
   AppName:
     Type: String
-    Description: Name of the application
+    Description: Name of the application (used for resource naming and tags).
     Default: chemtrack
   AppURL:
     Type: String
-    Description: root application url
+    Description: Root application domain name.
     Default: "chemtrack.767397980456.aws.glpoly.net"
   VpcId:
     Type: String
-    Description: VPC ID where the ECS cluster will be deployed
-    Default: vpc-019e35a7f8ca205e5
-
+    Description: VPC ID where the ECS cluster will be deployed.
+    Default: vpc-019e35a7f8ca205e5 # Placeholder
   PrivateSubnet1:
     Type: String
-    Description: First private subnet ID for the ECS cluster
-    Default: subnet-08de8ae010ebfa1f3
-
+    Description: First private subnet ID for ECS tasks.
+    Default: subnet-08de8ae010ebfa1f3 # Placeholder
   PrivateSubnet2:
     Type: String
-    Description: Second private subnet ID for the ECS cluster
-    Default: subnet-0205ddf1053073b5c
-
+    Description: Second private subnet ID for ECS tasks.
+    Default: subnet-0205ddf1053073b5c # Placeholder
   IntranetSubnet1:
     Type: String
-    Description: First intranet subnet ID for the ALB
-    Default: subnet-0ee959776d1683aa5
-
+    Description: First public or intranet subnet ID for the internal ALB.
+    Default: subnet-0ee959776d1683aa5 # Placeholder
   IntranetSubnet2:
     Type: String
-    Description: Second intranet subnet ID for the ALB
-    Default: subnet-07257f93f815ce77c
-
+    Description: Second public or intranet subnet ID for the internal ALB.
+    Default: subnet-07257f93f815ce77c # Placeholder
   AccessLogsBucket:
     Type: String
-    Description: S3 bucket for ALB access logs
+    Description: S3 bucket name for ALB access logs. Must exist prior to deployment.
     Default: chemtrack-access-logs
 
+# ------------------------------------------------------------------
+# Resources
+# ------------------------------------------------------------------
 Resources:
-  # Service Discovery Namespace
-  ServiceDiscoveryNamespace:
-    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
-    Properties:
-      Name: !Sub ${AppName}.local
-      Description: !Sub "Service discovery namespace for ${AppName} services"
-      Vpc: !Ref VpcId
 
-  # ECS Cluster
+## ECS Cluster & Service Discovery
+------------------------------------------------------------------
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
@@ -64,33 +59,16 @@ Resources:
         - Key: Name
           Value: !Sub ${AppName}-cluster
 
-  # CloudWatch Log Groups
-  LoginLogGroup:
-    Type: AWS::Logs::LogGroup
+  ServiceDiscoveryNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
     Properties:
-      LogGroupName: !Sub /ecs/${AppName}-login
-      RetentionInDays: 7
+      Name: !Sub ${AppName}.local
+      Description: !Sub "Service discovery namespace for ${AppName} services"
+      Vpc: !Ref VpcId
 
-  BackendLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub /ecs/${AppName}-backend
-      RetentionInDays: 7
-
-  MainLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub /ecs/${AppName}-main
-      RetentionInDays: 7
-
-  NginxLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub /ecs/${AppName}-nginx
-      RetentionInDays: 7
-
-
-  # ECS Task Execution Role
+## IAM Roles
+------------------------------------------------------------------
+  # Role for Fargate to pull images, publish logs, and use Secrets/SSM
   ECSTaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -98,29 +76,26 @@ Resources:
         Version: '2012-10-17'
         Statement:
           - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
+            Principal: { Service: ecs-tasks.amazonaws.com }
             Action: sts:AssumeRole
       ManagedPolicyArns:
+        # Essential policy for Fargate Task Execution
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       Policies:
-        - PolicyName: !Sub ${AppName}-secrets-policy
+        - PolicyName: !Sub ${AppName}-secrets-ssm-policy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
+                  - ssm:GetParameter
                 Resource:
                   - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:chemtrack-db-app-user*
                   - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:env-vars*
-              - Effect: Allow
-                Action:
-                  - ssm:GetParameter
-                Resource:
                   - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/chemtrack-api-key
 
-  # ECS Task Role
+  # Role for the application running inside the container
   ECSTaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -128,43 +103,40 @@ Resources:
         Version: '2012-10-17'
         Statement:
           - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
+            Principal: { Service: ecs-tasks.amazonaws.com }
             Action: sts:AssumeRole
       Policies:
         - PolicyName: !Sub ${AppName}-task-policy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              # Application access to Secrets and SSM for runtime configuration
               - Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
+                  - ssm:GetParameter
                 Resource:
                   - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:chemtrack-db-app-user*
                   - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:env-vars*
-              - Effect: Allow
-                Action:
-                  - ssm:GetParameter
-                Resource:
                   - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/chemtrack-api-key
-              # Add permissions for CloudWatch Logs
+              # Task access to CloudWatch Logs (redundant if using Execution Role but good for explicit permissions)
               - Effect: Allow
                 Action:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                  - logs:DescribeLogStreams
                 Resource:
-                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/${AppName}*
-                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/${AppName}*:log-stream:*
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/${AppName}*:*
 
-  # Security Groups
+## Networking: Security Groups
+------------------------------------------------------------------
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for the ALB
+      GroupDescription: Security group for the internal ALB (HTTP/HTTPS access from VPC only)
       VpcId: !Ref VpcId
       SecurityGroupIngress:
+        # Allows access from a specific internal CIDR block (assuming 10.0.0.0/8 is your VPC range)
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
@@ -180,13 +152,19 @@ Resources:
   ECSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for ECS tasks
+      GroupDescription: Security group for Fargate tasks
       VpcId: !Ref VpcId
       SecurityGroupIngress:
+        # Allows traffic from the ALB on ports 8000 and 80 (for Nginx/App containers)
         - IpProtocol: tcp
           FromPort: 8000
           ToPort: 8000
-          CidrIp: 10.0.0.0/8
+          SourceSecurityGroupId: !Ref ALBSecurityGroup # Recommended: restrict to ALB's SG
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+        # Optional: Internal communication from other parts of the VPC (e.g., specific subnets)
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
@@ -195,12 +173,13 @@ Resources:
         - Key: Name
           Value: !Sub ${AppName}-ecs-sg
 
-  # Application Load Balancer
+## Application Load Balancer
+------------------------------------------------------------------
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Name: !Sub ${AppName}-alb
-      Scheme: internal
+      Scheme: internal # Deploying in Intranet subnets suggests internal
       Type: application
       Subnets:
         - !Ref IntranetSubnet1
@@ -209,7 +188,7 @@ Resources:
         - !Ref ALBSecurityGroup
       LoadBalancerAttributes:
         - Key: access_logs.s3.enabled
-          Value: true
+          Value: 'true'
         - Key: access_logs.s3.bucket
           Value: !Ref AccessLogsBucket
         - Key: access_logs.s3.prefix
@@ -233,7 +212,7 @@ Resources:
             Host: '#{host}'
             Path: '/#{path}'
             Query: '#{query}'
-            StatusCode: HTTP_301
+            StatusCode: HTTP_301 # Permanent redirect to HTTPS
 
   HTTPSListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
@@ -242,76 +221,15 @@ Resources:
       Port: 443
       Protocol: HTTPS
       Certificates:
-        - CertificateArn: !ImportValue chemtrack-certificate-arn
+        - CertificateArn: !ImportValue chemtrack-certificate-arn # Assumes cert is created elsewhere
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref MainTargetGroup
-      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+          TargetGroupArn: !Ref MainTargetGroup # Default to the main app
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06 # Modern security policy
 
-  # Target Groups
-  LoginTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Name: !Sub ${AppName}-login-tg
-      Port: 8000
-      Protocol: HTTP
-      TargetType: ip
-      VpcId: !Ref VpcId
-      HealthCheckPath: /health
-      HealthCheckProtocol: HTTP
-      HealthCheckIntervalSeconds: 10
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 2
-      TargetGroupAttributes:
-        - Key: deregistration_delay.timeout_seconds
-          Value: 60
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-login-tg
-
-  NginxTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Name: !Sub ${AppName}-nginx-tg
-      Port: 80
-      Protocol: HTTP
-      TargetType: ip
-      VpcId: !Ref VpcId
-      HealthCheckPath: /health
-      HealthCheckProtocol: HTTP
-      HealthCheckIntervalSeconds: 10
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 2
-      TargetGroupAttributes:
-        - Key: deregistration_delay.timeout_seconds
-          Value: 60
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-nginx-tg
-
-  BackendTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Name: !Sub ${AppName}-backend-tg
-      Port: 8000
-      Protocol: HTTP
-      TargetType: ip
-      VpcId: !Ref VpcId
-      HealthCheckPath: /health
-      HealthCheckProtocol: HTTP
-      HealthCheckIntervalSeconds: 10
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 2
-      TargetGroupAttributes:
-        - Key: deregistration_delay.timeout_seconds
-          Value: 60
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-backend-tg
-
+## Target Groups
+------------------------------------------------------------------
+  # Target Group for the main application (default)
   MainTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -322,18 +240,69 @@ Resources:
       VpcId: !Ref VpcId
       HealthCheckPath: /health
       HealthCheckProtocol: HTTP
-      HealthCheckIntervalSeconds: 10
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 2
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
-          Value: 60
+          Value: '60'
       Tags:
         - Key: Name
           Value: !Sub ${AppName}-main-tg
 
-  # ALB Rules
+  # Target Group for the login service
+  LoginTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${AppName}-login-tg
+      Port: 8000
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref VpcId
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '60'
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-login-tg
+
+  # Target Group for the backend API service
+  BackendTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${AppName}-backend-tg
+      Port: 8000
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref VpcId
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '60'
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-backend-tg
+
+  # Target Group for static files (Nginx)
+  NginxTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${AppName}-nginx-tg
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref VpcId
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '60'
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-nginx-tg
+
+## ALB Listener Rules
+------------------------------------------------------------------
   LoginRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
@@ -341,24 +310,10 @@ Resources:
       Priority: 5
       Conditions:
         - Field: path-pattern
-          Values:
-            - /login*
+          Values: [ "/login*" ]
       Actions:
         - Type: forward
           TargetGroupArn: !Ref LoginTargetGroup
-
-  NginxRule:
-    Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    Properties:
-      ListenerArn: !Ref HTTPSListener
-      Priority: 15
-      Conditions:
-        - Field: path-pattern
-          Values:
-            - /static*
-      Actions:
-        - Type: forward
-          TargetGroupArn: !Ref NginxTargetGroup
 
   BackendRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
@@ -367,26 +322,38 @@ Resources:
       Priority: 10
       Conditions:
         - Field: path-pattern
-          Values:
-            - /backend*
+          Values: [ "/backend*" ]
       Actions:
         - Type: forward
           TargetGroupArn: !Ref BackendTargetGroup
+
+  NginxRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HTTPSListener
+      Priority: 15
+      Conditions:
+        - Field: path-pattern
+          Values: [ "/static*" ]
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref NginxTargetGroup
 
   MainRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
       ListenerArn: !Ref HTTPSListener
-      Priority: 1
+      Priority: 1 # Lowest priority, acts as a catch-all
       Conditions:
         - Field: path-pattern
-          Values:
-            - /
+          Values: [ "/" ]
       Actions:
         - Type: forward
           TargetGroupArn: !Ref MainTargetGroup
 
-  # ECS Task Definitions
+## ECS Task Definitions
+------------------------------------------------------------------
+  # Login Service
   LoginTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
@@ -394,8 +361,7 @@ Resources:
       Cpu: '512'
       Memory: '1024'
       NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
+      RequiresCompatibilities: [ FARGATE ]
       ExecutionRoleArn: !Ref ECSTaskExecutionRole
       TaskRoleArn: !Ref ECSTaskRole
       ContainerDefinitions:
@@ -404,23 +370,23 @@ Resources:
           Essential: true
           PortMappings:
             - ContainerPort: 8000
-              HostPort: 8000
               Protocol: tcp
           Environment:
             - Name: BASE_URL
               Value: !Ref AppURL
-            - Name: SECRET_KEY
+            - Name: SECRET_KEY # WARNING: Hardcoding secrets is bad practice, use Secrets Manager!
               Value: '64df77320c1b5b56396028e0dfc01deb'
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: !Ref LoginLogGroup
+              awslogs-group: !Sub /ecs/${AppName}-login
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
       Tags:
         - Key: Name
           Value: !Sub ${AppName}-login-task
 
+  # Nginx Service
   NginxTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
@@ -428,328 +394,5 @@ Resources:
       Cpu: '512'
       Memory: '1024'
       NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      ExecutionRoleArn: !Ref ECSTaskExecutionRole
-      TaskRoleArn: !Ref ECSTaskRole
-      ContainerDefinitions:
-        - Name: !Sub ${AppName}-nginx-container
-          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/chemtrack/nginx:latest
-          Essential: true
-          PortMappings:
-            - ContainerPort: 80
-              HostPort: 80
-              Protocol: tcp
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Ref NginxLogGroup
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: ecs
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-nginx-task
-
-  BackendTaskDefinition:
-    Type: AWS::ECS::TaskDefinition
-    Properties:
-      Family: !Sub ${AppName}-backend
-      Cpu: '2048'
-      Memory: '4096'
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      ExecutionRoleArn: !Ref ECSTaskExecutionRole
-      TaskRoleArn: !Ref ECSTaskRole
-      ContainerDefinitions:
-        - Name: !Sub ${AppName}-backend-container
-          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/chemtrack/backend:latest
-          Essential: true
-          PortMappings:
-            - ContainerPort: 8000
-              HostPort: 8000
-              Protocol: tcp
-          Environment:
-            - Name: ENVIRONMENT
-              Value: production
-            - Name: API_KEY_SECURITY
-              Value: "enabled"
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Ref BackendLogGroup
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: ecs
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-backend-task
-
-  MainTaskDefinition:
-    Type: AWS::ECS::TaskDefinition
-    Properties:
-      Family: !Sub ${AppName}-main
-      Cpu: '1024'
-      Memory: '2048'
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
-      TaskRoleArn: !GetAtt ECSTaskRole.Arn
-      ContainerDefinitions:
-        - Name: !Sub ${AppName}-main-container
-          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/chemtrack/main:latest
-          Essential: true
-          PortMappings:
-            - ContainerPort: 8000
-              HostPort: 8000
-              Protocol: tcp
-          Environment:
-            - Name: BASE_URL
-              Value: !Ref AppURL
-            - Name: SECRET_KEY
-              Value: '64df77320c1b5b56396028e0dfc01deb'
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Ref MainLogGroup
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: ecs
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-main-task
-
-
-
-  # ECS Services
-  LoginService:
-    Type: AWS::ECS::Service
-    DependsOn: LoginRule
-    Properties:
-      ServiceName: !Sub ${AppName}-login-service
-      Cluster: !Ref ECSCluster
-      TaskDefinition: !Ref LoginTaskDefinition
-      LaunchType: FARGATE
-      DesiredCount: 1
-      DeploymentConfiguration:
-        MinimumHealthyPercent: 100
-        MaximumPercent: 200
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
-          SecurityGroups:
-            - !Ref ECSSecurityGroup
-          Subnets:
-            - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2
-      LoadBalancers:
-        - ContainerName: !Sub ${AppName}-login-container
-          ContainerPort: 8000
-          TargetGroupArn: !Ref LoginTargetGroup
-      HealthCheckGracePeriodSeconds: 60
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-login-service
-      ServiceConnectConfiguration:
-        Enabled: true
-        Namespace: !Sub ${AppName}.local
-
-  NginxService:
-    Type: AWS::ECS::Service
-    DependsOn: NginxRule
-    Properties:
-      ServiceName: !Sub ${AppName}-nginx-service
-      Cluster: !Ref ECSCluster
-      TaskDefinition: !Ref NginxTaskDefinition
-      LaunchType: FARGATE
-      DesiredCount: 1
-      DeploymentConfiguration:
-        MinimumHealthyPercent: 100
-        MaximumPercent: 200
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
-          SecurityGroups:
-            - !Ref ECSSecurityGroup
-          Subnets:
-            - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2
-      LoadBalancers:
-        - ContainerName: !Sub ${AppName}-nginx-container
-          ContainerPort: 80
-          TargetGroupArn: !Ref NginxTargetGroup
-      HealthCheckGracePeriodSeconds: 60
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-nginx-service
-
-  BackendService:
-    Type: AWS::ECS::Service
-    DependsOn: BackendRule
-    Properties:
-      ServiceName: !Sub ${AppName}-backend-service
-      Cluster: !Ref ECSCluster
-      TaskDefinition: !Ref BackendTaskDefinition
-      LaunchType: FARGATE
-      DesiredCount: 1
-      DeploymentConfiguration:
-        MinimumHealthyPercent: 100
-        MaximumPercent: 200
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
-          SecurityGroups:
-            - !Ref ECSSecurityGroup
-          Subnets:
-            - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2
-      LoadBalancers:
-        - ContainerName: !Sub ${AppName}-backend-container
-          ContainerPort: 8000
-          TargetGroupArn: !Ref BackendTargetGroup
-      HealthCheckGracePeriodSeconds: 60
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-backend-service
-      ServiceConnectConfiguration:
-        Enabled: true
-        Namespace: !Sub ${AppName}.local
-
-  MainService:
-    Type: AWS::ECS::Service
-    DependsOn: MainRule
-    Properties:
-      ServiceName: !Sub ${AppName}-main-service
-      Cluster: !GetAtt ECSCluster.Arn
-      TaskDefinition: !Ref MainTaskDefinition
-      LaunchType: FARGATE
-      DesiredCount: 1
-      DeploymentConfiguration:
-        MinimumHealthyPercent: 100
-        MaximumPercent: 200
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
-          SecurityGroups:
-            - !Ref ECSSecurityGroup
-          Subnets:
-            - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2
-      LoadBalancers:
-        - ContainerName: !Sub ${AppName}-main-container
-          ContainerPort: 8000
-          TargetGroupArn: !Ref MainTargetGroup
-      HealthCheckGracePeriodSeconds: 60
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-main-service
-      ServiceConnectConfiguration:
-        Enabled: true
-        Namespace: !Sub ${AppName}.local
-
-  # DNS Record
-  ApplicationDNSRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneName: 767397980456.aws.glpoly.net.
-      Name: !Ref AppURL
-      Type: CNAME
-      TTL: 300
-      ResourceRecords:
-        - !GetAtt ApplicationLoadBalancer.DNSName
-
-Outputs:
-  ClusterName:
-    Description: The name of the ECS cluster
-    Value: !Ref ECSCluster
-    Export:
-      Name: !Sub ${AppName}-cluster-name
-
-  ClusterArn:
-    Description: The ARN of the ECS cluster
-    Value: !GetAtt ECSCluster.Arn
-    Export:
-      Name: !Sub ${AppName}-cluster-arn
-
-  LoadBalancerDNSName:
-    Description: The DNS name of the load balancer
-    Value: !GetAtt ApplicationLoadBalancer.DNSName
-    Export:
-      Name: !Sub ${AppName}-alb-dns-name
-
-  LoadBalancerArn:
-    Description: The ARN of the load balancer
-    Value: !Ref ApplicationLoadBalancer
-    Export:
-      Name: !Sub ${AppName}-alb-arn
-
-  ApplicationURL:
-    Description: The URL of the application
-    Value: "https://chemtrack.767397980456.aws.glpoly.net"
-    Export:
-      Name: !Sub ${AppName}-url
-
-  ECSTaskExecutionRoleArn:
-    Description: The ARN of the ECS task execution role
-    Value: !GetAtt ECSTaskExecutionRole.Arn
-    Export:
-      Name: !Sub ${AppName}-ecs-task-execution-role-arn
-
-  ECSTaskRoleArn:
-    Description: The ARN of the ECS task role
-    Value: !GetAtt ECSTaskRole.Arn
-    Export:
-      Name: !Sub ${AppName}-ecs-task-role-arn
-
-  HTTPSListenerArn:
-    Description: The ARN of the HTTPS listener
-    Value: !Ref HTTPSListener
-    Export:
-      Name: !Sub ${AppName}-https-listener-arn
-
-  ECSSecurityGroupId:
-    Description: The ID of the ECS security group
-    Value: !Ref ECSSecurityGroup
-    Export:
-      Name: !Sub ${AppName}-ecs-security-group-id
-
-  MainServiceArn:
-    Description: The ARN of the Main ECS service
-    Value: !Ref MainService
-    Export:
-      Name: !Sub ${AppName}-main-service-arn
-
-  MainTaskDefinitionArn:
-    Description: The ARN of the Main Task Definition
-    Value: !Ref MainTaskDefinition
-    Export:
-      Name: !Sub ${AppName}-main-task-definition-arn
-
-  MainTargetGroupArn:
-    Description: The ARN of the Main Target Group
-    Value: !Ref MainTargetGroup
-    Export:
-      Name: !Sub ${AppName}-main-target-group-arn
-
-  NginxServiceArn:
-    Description: The ARN of the Nginx ECS service
-    Value: !Ref NginxService
-    Export:
-      Name: !Sub ${AppName}-nginx-service-arn
-
-  NginxTaskDefinitionArn:
-    Description: The ARN of the Nginx Task Definition
-    Value: !Ref NginxTaskDefinition
-    Export:
-      Name: !Sub ${AppName}-nginx-task-definition-arn
-
-  NginxTargetGroupArn:
-    Description: The ARN of the Nginx Target Group
-    Value: !Ref NginxTargetGroup
-    Export:
-      Name: !Sub ${AppName}-nginx-target-group-arn
-      
-  ServiceDiscoveryNamespaceId:
-    Description: The ID of the service discovery namespace
-    Value: !Ref ServiceDiscoveryNamespace
-    Export:
-      Name: !Sub ${AppName}-service-discovery-namespace-id
+      RequiresCompatibilities: [ FARGATE ]
+      ExecutionRoleArn:
